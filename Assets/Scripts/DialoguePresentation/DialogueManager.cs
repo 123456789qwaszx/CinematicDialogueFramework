@@ -27,6 +27,8 @@ public class DialogueManager : Singleton<DialogueManager>
 
     [Header("Timing Plan")] [SerializeField]
     private TimingPlanSO defaultTimingPlan;
+    
+    [SerializeField] private DialogueRouteCatalogSO routeCatalog;
 
     // ===== Data lookup =====
     private readonly Dictionary<string, DialogueSequenceData> _sequencesById = new();
@@ -167,11 +169,48 @@ public class DialogueManager : Singleton<DialogueManager>
     #endregion
 
     #region Public API - 시작/종료
+    public void StartDialogue(string situationKey)
+    {
+        if (routeCatalog == null)
+        {
+            Debug.LogError("[DialogueManager] routeCatalog is null (required for StartDialogue(situationKey))");
+            return;
+        }
+
+        if (!routeCatalog.TryGetRoute(situationKey, out var route))
+        {
+            Debug.LogError($"[DialogueManager] Route not found: {situationKey}");
+            return;
+        }
+
+        if (route.Kind != DialogueRouteKind.Pipeline)
+        {
+            Debug.LogError($"[DialogueManager] Route '{situationKey}' is not Pipeline kind");
+            return;
+        }
+
+        if (route.Sequence == null || string.IsNullOrEmpty(route.PipelineSituationId))
+        {
+            Debug.LogError($"[DialogueManager] Pipeline route invalid: {situationKey}");
+            return;
+        }
+
+        // timingPlanOverride가 있으면 그걸 쓰고, 없으면 기존 defaultTimingPlan 사용
+        var plan = route.TimingPlanOverride != null ? route.TimingPlanOverride : defaultTimingPlan;
+
+        // ✅ 기존 로직 재사용 (약간만 확장: timingPlan 파라미터 받게)
+        StartDialogue(route.SequenceId, route.PipelineSituationId, plan);
+    }
+    
+    public void StartDialogue(string sequenceId, string situationId)
+    {
+        StartDialogue(sequenceId, situationId, defaultTimingPlan);
+    }
 
     /// <summary>
     /// (sequenceId, situationId)를 기준으로 대화 시작
     /// </summary>
-    public void StartDialogue(string sequenceId, string situationId)
+    private void StartDialogue(string sequenceId, string situationId, TimingPlanSO timingPlan)
     {
         if (string.IsNullOrEmpty(sequenceId))
         {
@@ -227,7 +266,8 @@ public class DialogueManager : Singleton<DialogueManager>
         }
 
         // 코루틴으로 실행
-        _playRoutine = StartCoroutine(PlayCommandsCoroutine(commands, defaultTimingPlan));
+        //_playRoutine = StartCoroutine(PlayCommandsCoroutine(commands, defaultTimingPlan));
+        _playRoutine = StartCoroutine(PlayCommandsCoroutine(commands, timingPlan));
     }
 
     private void QuitExistingDialogue()

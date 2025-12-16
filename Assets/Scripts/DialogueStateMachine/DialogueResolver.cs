@@ -2,19 +2,25 @@ using System.Collections.Generic;
 
 public sealed class DialogueResolver
 {
-    private readonly DialogueCatalog _catalog;
+    private readonly IDialogueRouteCatalog _routes;
 
-    public DialogueResolver(DialogueCatalog catalog)
+    public DialogueResolver(IDialogueRouteCatalog routes)
     {
-        _catalog = catalog;
+        _routes = routes;
     }
 
     public (DialogueSituationSpec spec, DialogueRuntimeState state) ResolveNew(string situationKey)
     {
-        DialogueSituationSpec situationSpec = _catalog.Get(situationKey);
-        if (situationSpec == null) return (null, null);
+        if (!_routes.TryGetRoute(situationKey, out var route))
+            return (null, null);
 
-        DialogueRuntimeState state = new ()
+        // Resolver는 상태머신 Spec만 해석한다.
+        if (route.Kind != DialogueRouteKind.StateMachine || route.StateMachineSpec == null)
+            return (null, null);
+
+        DialogueSituationSpec situationSpec = route.StateMachineSpec;
+
+        DialogueRuntimeState state = new()
         {
             SituationKey = situationKey,
             BranchKey = "Default",
