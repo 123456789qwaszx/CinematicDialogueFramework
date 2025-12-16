@@ -207,7 +207,7 @@ public class DialogueManager : Singleton<DialogueManager>
             return;
         }
 
-        if (!routeCatalog.TryGetRoute(situationKey, out var route))
+        if (!routeCatalog.TryGetRoute(situationKey, out DialogueRoute route))
         {
             Debug.LogError($"[DialogueManager] Route not found: {situationKey}");
             return;
@@ -400,18 +400,19 @@ public class DialogueManager : Singleton<DialogueManager>
         EndDialogue();
     }
 
-    /// <summary>
-    /// SituationEntry -> ISequenceCommand 리스트로 변환
-    /// (필요하면 여기서 라인마다 효과 커맨드도 삽입 가능)
-    /// </summary>
     private List<ISequenceCommand> BuildCommandsFrom(SituationEntry situation)
     {
         var commands = new List<ISequenceCommand>();
 
-        foreach (DialogueLine line in situation.lines)
+        if (situation.nodes == null)
+            return commands;
+
+        foreach (DialogueNodeSpec node in situation.nodes)
         {
-            if (line == null)
+            if (node == null || node.line == null)
                 continue;
+
+            DialogueLine line = node.line;
 
             // 1) 기본: 한 줄 보여주는 커맨드
             commands.Add(new ShowLineCommand(line));
@@ -422,7 +423,8 @@ public class DialogueManager : Singleton<DialogueManager>
             //     commands.Add(new ShakeCameraCommand { strength = 0.8f, duration = 0.2f });
             // }
 
-            // 3) 필요하면 추가 Command 붙이기 (SE, BGM, 컷인 등)
+            // 3) 필요하면 node.gateTokens를 참조해서
+            //    "이 라인 전에/후에 특정 연출 커맨드를 추가" 같은 것도 가능
         }
 
         return commands;

@@ -181,13 +181,7 @@ public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
         // 상태머신 스펙에는 Expression/Position 정보가 없으니
         // 1주차는 일단 기본값으로 채우고,
         // 나중에 확장할 때 Branch/Variant 등을 보고 매핑할 수 있음.
-        return new DialogueLine
-        {
-            speakerId  = vm.SpeakerId,
-            expression = Expression.Default,
-            text       = vm.Text,
-            position   = DialoguePosition.Left
-        };
+        return vm.Line;
     }
 
     private void StopCurrent()

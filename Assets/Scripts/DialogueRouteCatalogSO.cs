@@ -4,28 +4,25 @@ using UnityEngine;
 
 public enum DialogueRouteKind
 {
-    StateMachine,
-    Pipeline
+    StateMachine, // 상태머신 DialogueSession + GateRunner로 돌릴 때
+    Pipeline      // 기존 DialogueManager 파이프라인으로 돌릴 때
 }
 
 [Serializable]
 public sealed class DialogueRouteEntry
 {
     [Header("Global Key")]
-    public string situationKey;
+    public string situationKey; // 외부에서 사용할 전역 키
 
-    [Header("Route Kind")]
+    [Header("Execution Mode")]
     public DialogueRouteKind kind = DialogueRouteKind.StateMachine;
 
-    [Header("StateMachine")]
-    public DialogueSituationSpec stateMachineSpec;
-
-    [Header("Pipeline")]
+    [Header("Shared Data (StateMachine / Pipeline 공통)")]
     public DialogueSequenceData sequence;
-    public string pipelineSituationId;
+    public string situationId; // sequence 내 SituationEntry.situationId
 
-    [Header("Optional")]
-    public TimingPlanSO timingPlanOverride; // null이면 DialogueManager의 defaultTimingPlan 사용
+    [Header("Pipeline 전용 옵션")]
+    public TimingPlanSO timingPlanOverride; // null이면 DialogueManager.defaultTimingPlan 사용
 }
 
 public readonly struct DialogueRoute
@@ -33,10 +30,8 @@ public readonly struct DialogueRoute
     public readonly string SituationKey;
     public readonly DialogueRouteKind Kind;
 
-    public readonly DialogueSituationSpec StateMachineSpec;
-
     public readonly DialogueSequenceData Sequence;
-    public readonly string PipelineSituationId;
+    public readonly string SituationId;
     public readonly TimingPlanSO TimingPlanOverride;
 
     public string SequenceId => Sequence != null ? Sequence.sequenceId : null;
@@ -44,12 +39,9 @@ public readonly struct DialogueRoute
     public DialogueRoute(DialogueRouteEntry e)
     {
         SituationKey = e.situationKey;
-        Kind = e.kind;
-
-        StateMachineSpec = e.stateMachineSpec;
-
-        Sequence = e.sequence;
-        PipelineSituationId = e.pipelineSituationId;
+        Kind         = e.kind;
+        Sequence     = e.sequence;
+        SituationId  = e.situationId;
         TimingPlanOverride = e.timingPlanOverride;
     }
 }

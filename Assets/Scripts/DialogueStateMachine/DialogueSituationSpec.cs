@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-
 [CreateAssetMenu(menuName = "Dialogue/Demo/Situation Spec", fileName = "DialogueSituationSpec")]
 public class DialogueSituationSpec : ScriptableObject
 {
@@ -14,10 +13,16 @@ public class DialogueSituationSpec : ScriptableObject
 [Serializable]
 public class DialogueNodeSpec
 {
-    public string speakerId = "Narrator";
+    [Header("Display / Content")]
+    public DialogueLine line = new DialogueLine
+    {
+        speakerId  = "Narrator",
+        expression = Expression.Default,
+        text       = "",
+        position   = DialoguePosition.Left
+    };
 
-    [TextArea(3, 10)] public string text;
-
+    [Header("Progression Gate")]
     // Ensure at least one token per node (if none, insert an Immediately token).
     public List<GateToken> gateTokens = new() { GateToken.Input() };
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 public sealed class DialogueResolver
 {
@@ -9,39 +10,55 @@ public sealed class DialogueResolver
         _routes = routes;
     }
 
-    public (DialogueSituationSpec spec, DialogueRuntimeState state) ResolveNew(string situationKey)
+    public (SituationEntry situation, DialogueRuntimeState state) ResolveNew(string situationKey)
     {
         if (!_routes.TryGetRoute(situationKey, out var route))
             return (null, null);
 
-        // Resolver는 상태머신 Spec만 해석한다.
-        if (route.Kind != DialogueRouteKind.StateMachine || route.StateMachineSpec == null)
+        // 상태머신 모드만 처리 (파이프라인은 DialogueManager가 따로 돌림)
+        if (route.Kind != DialogueRouteKind.StateMachine)
             return (null, null);
 
-        DialogueSituationSpec situationSpec = route.StateMachineSpec;
+        if (route.Sequence == null || string.IsNullOrEmpty(route.SituationId))
+            return (null, null);
+
+        SituationEntry situation = FindSituation(route.Sequence, route.SituationId);
+        if (situation == null || situation.nodes == null || situation.nodes.Count == 0)
+            return (null, null);
 
         DialogueRuntimeState state = new()
         {
             SituationKey = situationKey,
-            BranchKey = "Default",
-            VariantKey = "Default",
-            NodeCursor = 0,
+            BranchKey    = "Default",
+            VariantKey   = "Default",
+            NodeCursor   = 0,
         };
 
-        ResolveCurrentNodeGate(situationSpec, state);
-        return (situationSpec, state);
+        ResolveCurrentNodeGate(situation, state);
+        return (situation, state);
     }
 
-    public void ResolveCurrentNodeGate(DialogueSituationSpec situationSpec, DialogueRuntimeState state)
+    private SituationEntry FindSituation(DialogueSequenceData seq, string situationId)
     {
-        state.Gate.Tokens = new List<GateToken>();
-        state.Gate.TokenCursor = 0;
-        state.Gate.InFlight = default;
+        if (seq == null || seq.situations == null)
+            return null;
 
-        if (state.NodeCursor < 0 || state.NodeCursor >= situationSpec.nodes.Count)
+        return seq.situations.FirstOrDefault(s =>
+            s != null &&
+            !string.IsNullOrEmpty(s.situationId) &&
+            s.situationId == situationId);
+    }
+
+    public void ResolveCurrentNodeGate(SituationEntry situation, DialogueRuntimeState state)
+    {
+        state.Gate.Tokens     = new List<GateToken>();
+        state.Gate.TokenCursor = 0;
+        state.Gate.InFlight    = default;
+
+        if (state.NodeCursor < 0 || situation.nodes == null || state.NodeCursor >= situation.nodes.Count)
             return;
 
-        var node = situationSpec.nodes[state.NodeCursor];
+        var node = situation.nodes[state.NodeCursor];
 
         if (node.gateTokens == null || node.gateTokens.Count == 0)
             state.Gate.Tokens.Add(GateToken.Immediately());
@@ -49,15 +66,14 @@ public sealed class DialogueResolver
             state.Gate.Tokens.AddRange(node.gateTokens);
     }
 
-    public NodeViewModel BuildNodeViewModel(DialogueSituationSpec situationSpec, DialogueRuntimeState state)
+    public NodeViewModel BuildNodeViewModel(SituationEntry situation, DialogueRuntimeState state)
     {
-        DialogueNodeSpec nodeSpec = situationSpec.nodes[state.NodeCursor];
+        DialogueNodeSpec nodeSpec = situation.nodes[state.NodeCursor];
 
         return new NodeViewModel(
             state.SituationKey,
             state.NodeCursor,
-            nodeSpec.speakerId,
-            nodeSpec.text,
+            nodeSpec.line,               // ✅ 통합된 한 줄 데이터
             state.BranchKey,
             state.VariantKey,
             state.CurrentNodeTokenCount
