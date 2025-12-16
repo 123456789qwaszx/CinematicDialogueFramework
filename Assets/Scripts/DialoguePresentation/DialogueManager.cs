@@ -46,10 +46,19 @@ public class DialogueManager : Singleton<DialogueManager>
     private CommandContext _commandContext;
     private CancellationTokenSource _cts;
 
-    // ===== WaitInput 게이트용 상태 =====
-    private bool _inputGatePending;
-    private bool _inputGateTriggered;
+// ===== GateRunner (통합 게이트) =====
+    [Header("Gate Runner (Unified)")]
+    [SerializeField] private UnitySignalBus signalBus; // WaitSignal용
+    [SerializeField] private float autoAdvanceDelay = 0.6f; // Auto 모드일 때 Input 토큰 자동 진행 딜레이
 
+    private UnityInputSource _gateInput;
+    private UnityTimeSource _gateTime;
+    private DialogueGateRunner _gateRunner;
+
+// Pipeline에서도 GateRunner.Tick을 쓰기 위한 "더미 런타임 상태"
+    private readonly DialogueRuntimeState _gateState = new DialogueRuntimeState();
+    private DialogueContext _gateContext;
+    
     // ===== Events =====
     public event Action OnDialogueStarted;
     public event Action OnDialogueEnded;
@@ -100,6 +109,27 @@ public class DialogueManager : Singleton<DialogueManager>
         _commandService = new CommandService(commandServiceConfig);
         _commandContext = new CommandContext(_commandService);
         ResetCancellationToken();
+        InitUnifiedGateInfra();
+    }
+    
+    private void InitUnifiedGateInfra()
+    {
+        _gateInput = new UnityInputSource();
+        _gateTime  = new UnityTimeSource();
+
+        // signalBus가 null이어도 컴파일은 되지만, WaitSignal은 동작하지 않음
+        if (signalBus == null)
+            Debug.LogWarning("[DialogueManager] signalBus is null. WaitSignal gates will never pass.");
+
+        _gateRunner = new DialogueGateRunner(_gateInput, _gateTime, signalBus);
+
+        _gateContext = new DialogueContext
+        {
+            IsAutoMode = false,
+            IsSkipping = false,
+            TimeScale = 1f,
+            AutoAdvanceDelay = autoAdvanceDelay
+        };
     }
 
     private void LoadAllSequences()
@@ -447,98 +477,69 @@ public class DialogueManager : Singleton<DialogueManager>
         return null;
     }
 
-    /// <summary>
-    /// TimingGateSpec에 따라 커맨드 묶음 사이의 대기를 처리
-    /// - DelaySeconds  : 시간 대기
-    /// - WaitInput     : 플레이어 입력 대기 (NotifyInputGate로 신호)
-    /// - WaitSignal    : TODO (외부 연출 신호 시스템에 연결 예정)
-    /// - WaitFlagInt   : TODO (게임 상태 플래그 시스템에 연결 예정)
-    /// </summary>
     private IEnumerator WaitTimingGate(TimingGateSpec gate, CommandContext ctx)
     {
-        switch (gate.type)
+        if (_gateRunner == null)
+            InitUnifiedGateInfra();
+
+        // TimingGateSpec -> GateToken 리스트로 변환
+        List<GateToken> tokens = TimingGateTokenMapper.ToTokens(gate);
+
+        // 더미 상태에 Gate 설정
+        _gateState.Gate.Tokens = tokens;
+        _gateState.Gate.TokenCursor = 0;
+        _gateState.Gate.InFlight = default;
+
+        // GateContext를 CommandContext에서 동기화
+        SyncGateContextFromCommand(ctx);
+
+        // Session처럼 "같은 프레임에 즉시 토큰은 끝까지 소비" 가능하게 처리
+        while (!_gateState.IsNodeGateCompleted)
         {
-            case TimingGateType.Immediate:
-                // 바로 다음 커맨드 묶음으로 진행
+            if (ctx.Token.IsCancellationRequested)
                 yield break;
 
-            case TimingGateType.DelaySeconds:
+            SyncGateContextFromCommand(ctx);
+
+            bool progressed = false;
+
+            // 한 프레임 내에서 가능한 만큼 진행
+            while (!_gateState.IsNodeGateCompleted)
             {
-                float duration = Mathf.Max(0f, gate.delaySeconds);
-                float t = 0f;
-
-                while (t < duration)
-                {
-                    if (ctx.Token.IsCancellationRequested)
-                        yield break;
-
-                    if (ctx.IsSkipping) // 스킵이면 더 기다릴 필요 없음
-                        yield break;
-
-                    t += Time.deltaTime * ctx.TimeScale;
-                    yield return null;
-                }
-
-                break;
+                bool moved = _gateRunner.Tick(_gateState, _gateContext);
+                if (!moved) break;
+                progressed = true;
             }
 
-            case TimingGateType.WaitInput:
-            {
-                // UIDialogue 등에서 NotifyInputGate()가 불릴 때까지 대기
-                _inputGatePending = true;
-                _inputGateTriggered = false;
-
-                if (showDebugInfo)
-                    Debug.Log("[DialogueManager] Waiting for input gate...");
-
-                while (!_inputGateTriggered)
-                {
-                    if (ctx.Token.IsCancellationRequested || ctx.IsSkipping)
-                    {
-                        _inputGatePending = false;
-                        _inputGateTriggered = false;
-                        yield break;
-                    }
-
-                    yield return null;
-                }
-
-                _inputGatePending = false;
-                _inputGateTriggered = false;
-                break;
-            }
-
-            case TimingGateType.WaitSignal:
-            {
-                // TODO: 나중에 Timeline/연출 시스템과 연동해서 신호를 받을 수 있게 확장
-                // ex) while (!SignalBus.Has(gate.signalId)) yield return null;
+            if (_gateState.IsNodeGateCompleted)
                 yield break;
-            }
 
-            case TimingGateType.WaitFlagInt:
-            {
-                // TODO: 게임 상태 플래그 시스템에 맞춰 구현
-                // ex) while (GameFlags.GetInt(gate.flagKey) != gate.compareValue) yield return null;
-                yield break;
-            }
-
-            default:
-                yield break;
+            // 진행 못 했으면 다음 프레임 대기
+            if (!progressed)
+                yield return null;
+            else
+                yield return null;
         }
+    }
+
+    private void SyncGateContextFromCommand(CommandContext ctx)
+    {
+        _gateContext.IsAutoMode = ctx.IsAutoMode;
+        _gateContext.IsSkipping = ctx.IsSkipping;
+        _gateContext.TimeScale = ctx.TimeScale <= 0f ? 0.01f : ctx.TimeScale;
+        _gateContext.AutoAdvanceDelay = autoAdvanceDelay <= 0f ? 0.4f : autoAdvanceDelay;
     }
 
     #endregion
 
     /// <summary>
-    /// WaitInput 게이트를 통과시키는 신호
-    /// - UIDialogue.OnClickNext 등에서 호출
+    /// ✅ 통합된 입력 게이트 통과 신호
+    /// - 이제는 플래그를 올리는 게 아니라, GateRunner가 읽을 수 있도록 Pulse를 쏜다.
+    /// - (DialogueBootstrap의 Next 버튼이 이 메서드를 호출해도 됨)
     /// </summary>
     public void NotifyInputGate()
     {
-        if (_inputGatePending)
-        {
-            _inputGateTriggered = true;
-        }
+        _gateInput?.PulseAdvance();
     }
 
     #region CancellationToken 관리
