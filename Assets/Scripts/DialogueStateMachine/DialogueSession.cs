@@ -3,7 +3,7 @@ using System;
 public class DialogueSession
 {
     public event Action<NodeViewModel> OnNodeEntered;
-    public event Action<int, int> OnTokenProgress; // (tokenCursor, tokenCount)
+    public event Action<int, int> OnTokenProgress;
     public event Action OnSituationEnded;
 
     public DialogueRuntimeState State => _state;
@@ -72,7 +72,6 @@ public class DialogueSession
 
         bool progressed = false;
 
-        // 현재 노드의 GateTokens 처리
         while (!_state.IsNodeGateCompleted)
         {
             bool moved = _gateRunner.Tick(_state, Context);
@@ -82,7 +81,6 @@ public class DialogueSession
             OnTokenProgress?.Invoke(_state.Gate.TokenCursor, _state.CurrentNodeTokenCount);
         }
 
-        // 노드 게이트 완료 → 다음 노드로 이동
         if (_state.IsNodeGateCompleted)
         {
             _state.NodeCursor++;
@@ -99,8 +97,6 @@ public class DialogueSession
             EnterNode();
             progressed = true;
         }
-
-        // progressed는 디버깅용으로 필요하면 사용
     }
 
     private void EnterNode()
@@ -139,9 +135,9 @@ public class DialogueSession
 
         _resolver.ResolveCurrentNodeGate(_situation, _state);
 
-        _state.Gate.TokenCursor                 = save.TokenCursor;
-        _state.Gate.InFlight.RemainingSeconds   = save.RemainingSeconds;
-        _state.Gate.InFlight.WaitingSignalKey   = save.WaitingSignalKey;
+        _state.Gate.TokenCursor               = save.TokenCursor;
+        _state.Gate.InFlight.RemainingSeconds = save.RemainingSeconds;
+        _state.Gate.InFlight.WaitingSignalKey = save.WaitingSignalKey;
 
         EnterNode();
         return true;

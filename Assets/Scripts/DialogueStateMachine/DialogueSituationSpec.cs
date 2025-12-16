@@ -23,6 +23,5 @@ public class DialogueNodeSpec
     };
 
     [Header("Progression Gate")]
-    // Ensure at least one token per node (if none, insert an Immediately token).
     public List<GateToken> gateTokens = new() { GateToken.Input() };
 }

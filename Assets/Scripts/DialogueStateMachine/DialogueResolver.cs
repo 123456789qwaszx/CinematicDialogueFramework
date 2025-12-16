@@ -15,10 +15,6 @@ public sealed class DialogueResolver
         if (!_routes.TryGetRoute(situationKey, out var route))
             return (null, null);
 
-        // 상태머신 모드만 처리 (파이프라인은 DialogueManager가 따로 돌림)
-        if (route.Kind != DialogueRouteKind.StateMachine)
-            return (null, null);
-
         if (route.Sequence == null || string.IsNullOrEmpty(route.SituationId))
             return (null, null);
 
@@ -51,7 +47,7 @@ public sealed class DialogueResolver
 
     public void ResolveCurrentNodeGate(SituationEntry situation, DialogueRuntimeState state)
     {
-        state.Gate.Tokens     = new List<GateToken>();
+        state.Gate.Tokens      = new List<GateToken>();
         state.Gate.TokenCursor = 0;
         state.Gate.InFlight    = default;
 
@@ -73,7 +69,7 @@ public sealed class DialogueResolver
         return new NodeViewModel(
             state.SituationKey,
             state.NodeCursor,
-            nodeSpec.line,               // ✅ 통합된 한 줄 데이터
+            nodeSpec.line,
             state.BranchKey,
             state.VariantKey,
             state.CurrentNodeTokenCount
