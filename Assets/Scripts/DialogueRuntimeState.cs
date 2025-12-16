@@ -120,4 +120,5 @@ public struct DialogueContext
     public bool IsAutoMode;
     public bool IsSkipping;
     public float TimeScale;
+    public float AutoAdvanceDelay;
 }
