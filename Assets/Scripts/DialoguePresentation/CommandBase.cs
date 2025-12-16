@@ -1,7 +1,6 @@
 using System.Collections;
-using UnityEngine;
 using System.Threading;
-
+using UnityEngine;
 
 public interface ISequenceCommand
 {
@@ -13,18 +12,71 @@ public interface ISequenceCommand
 public class CommandContext
 {
     private readonly CommandService _services;
+    private readonly DialogueContext _dialogueContext;
+
+    /// <summary>
+    /// 공용 실행 컨텍스트(스킵/오토/타임스케일)를 래핑한다.
+    /// </summary>
+    public DialogueContext DialogueContext => _dialogueContext;
+
     public CommandContext(CommandService services)
+        : this(services, new DialogueContext())
+    {
+    }
+
+    public CommandContext(CommandService services, DialogueContext dialogueContext)
     {
         _services = services;
+        _dialogueContext = dialogueContext ?? new DialogueContext();
     }
-    
-    public bool IsSkipping { get; set; }
-    public bool IsAutoMode { get; set; }
-    public float TimeScale { get; set; } = 1f;
 
+    /// <summary>
+    /// 스킵 모드: true면 가능한 모든 대기/연출을 즉시 통과하려고 시도
+    /// </summary>
+    public bool IsSkipping
+    {
+        get => _dialogueContext != null && _dialogueContext.IsSkipping;
+        set
+        {
+            if (_dialogueContext != null)
+                _dialogueContext.IsSkipping = value;
+        }
+    }
+
+    /// <summary>
+    /// 오토 모드: true면 Input 게이트도 일정 딜레이 후 자동 통과
+    /// </summary>
+    public bool IsAutoMode
+    {
+        get => _dialogueContext != null && _dialogueContext.IsAutoMode;
+        set
+        {
+            if (_dialogueContext != null)
+                _dialogueContext.IsAutoMode = value;
+        }
+    }
+
+    /// <summary>
+    /// 연출용 타임스케일 (0 이하로 내려가면 최소값으로 보정해서 사용)
+    /// </summary>
+    public float TimeScale
+    {
+        get => _dialogueContext != null && _dialogueContext.TimeScale > 0f
+            ? _dialogueContext.TimeScale
+            : 1f;
+        set
+        {
+            if (_dialogueContext != null)
+                _dialogueContext.TimeScale = value;
+        }
+    }
+
+    /// <summary>
+    /// 커맨드 취소 토큰 (코루틴 실행 중단용)
+    /// </summary>
     public CancellationToken Token { get; set; }
-    
-    
+
+    // ==== 서비스 래핑 메서드들 ====
 
     public void ShakeCamera(float strength, float duration)
     {
@@ -35,10 +87,10 @@ public class CommandContext
     {
         return _services?.ShowLine(line, this);
     }
-    
+
     public void ShowLineImmediate(DialogueLine line)
     {
-       _services?.ShowLineImmediate(line);
+        _services?.ShowLineImmediate(line);
     }
 }
 
@@ -66,7 +118,7 @@ public abstract class CommandBase : ISequenceCommand
             OnSkip(ctx);
             yield break;
         }
-        
+
         // 실제 연출 로직
         yield return ExecuteInner(ctx);
     }

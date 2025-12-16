@@ -115,10 +115,17 @@ public struct GateInFlight
 /// This state is propagated across multiple systems (Runner/Typing/WaitInput, etc.).
 /// </summary>
 [Serializable]
-public struct DialogueContext
+public sealed class DialogueContext
 {
+    // 자동 진행 모드 여부 (ON이면 Input 게이트도 일정 딜레이 후 자동 통과)
     public bool IsAutoMode;
+
+    // 스킵 모드 여부 (ON이면 가능한 모든 대기/연출을 즉시 통과)
     public bool IsSkipping;
-    public float TimeScale;
-    public float AutoAdvanceDelay;
+
+    // 연출용 타임스케일 (0 이하로 가면 최소값으로 보정)
+    public float TimeScale = 1f;
+
+    // AutoMode일 때 Input 토큰 자동 진행 딜레이
+    public float AutoAdvanceDelay = 0.6f;
 }
