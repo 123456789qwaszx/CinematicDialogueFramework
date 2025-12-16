@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f5ee6fa5b0de464b8b9f7f44bb5ceda, type: 3}
+  m_Name: IntroSpec
+  m_EditorClassIdentifier: Assembly-CSharp::DialogueSituationSpec
+  situationKey: Intro
+  nodes:
+  - speakerId: Ami
+    text: Space / Button Test
+    gateTokens:
+    - Type: 1
+      Seconds: 0
+      SignalKey: 
+  - speakerId: Baki
+    text: Delay Test / 1.5f
+    gateTokens:
+    - Type: 2
+      Seconds: 1.5
+      SignalKey: 
+  - speakerId: Cuba
+    text: Signal Test / Click 'S'
+    gateTokens:
+    - Type: 3
+      Seconds: 0
+      SignalKey: '"BattleEnd"'
