@@ -1,7 +1,9 @@
+using System.Collections.Generic;
+
 /// <summary>
-/// A display-oriented ViewModel to pass to the Presenter.
-/// A data bundle derived from RuntimeState + Spec.
-/// 이제 표준 "한 줄" 데이터는 DialogueLine을 그대로 안고 간다.
+/// Presenter에 넘겨주는 "노드 단위" ViewModel.
+/// - 한 노드 안의 커맨드 묶음(CommandSpecs)
+/// - 그 중 대표 라인(PrimaryLine)을 함께 담고 있음
 /// </summary>
 public readonly struct NodeViewModel
 {
@@ -9,32 +11,41 @@ public readonly struct NodeViewModel
     public readonly int NodeIndex;
 
     /// <summary>
-    /// 상태머신/파이프라인 공통의 한 줄 데이터
+    /// 이 노드를 구성하는 커맨드 스펙 묶음
     /// </summary>
-    public readonly DialogueLine Line;
+    public readonly IReadOnlyList<NodeCommandSpec> CommandSpecs;
+
+    /// <summary>
+    /// 텍스트 위주 Presenter(예: TMP UI)를 위한 대표 대사 라인
+    /// - 보통 첫 번째 ShowLine 커맨드
+    /// </summary>
+    public readonly DialogueLine PrimaryLine;
 
     public readonly string BranchKey;
     public readonly string VariantKey;
 
     public readonly int TokenCount;
 
-    // ---- 편의 프로퍼티 (기존 코드 호환용) ----
-    public string SpeakerId => Line != null ? Line.speakerId : string.Empty;
-    public string Text      => Line != null ? Line.text      : string.Empty;
-    public Expression Expression => Line != null ? Line.expression : Expression.Default;
-    public DialoguePosition Position => Line != null ? Line.position : DialoguePosition.Left;
+    // ---- 기존 코드 호환용 편의 프로퍼티 ----
+
+    public string SpeakerId => PrimaryLine != null ? PrimaryLine.speakerId : string.Empty;
+    public string Text      => PrimaryLine != null ? PrimaryLine.text      : string.Empty;
+    public Expression Expression => PrimaryLine != null ? PrimaryLine.expression : Expression.Default;
+    public DialoguePosition Position => PrimaryLine != null ? PrimaryLine.position : DialoguePosition.Left;
 
     public NodeViewModel(
         string situationKey,
         int nodeIndex,
-        DialogueLine line,
+        IReadOnlyList<NodeCommandSpec> commandSpecs,
+        DialogueLine primaryLine,
         string branchKey,
         string variantKey,
         int tokenCount)
     {
         SituationKey = situationKey;
         NodeIndex    = nodeIndex;
-        Line         = line;
+        CommandSpecs = commandSpecs;
+        PrimaryLine  = primaryLine;
         BranchKey    = branchKey;
         VariantKey   = variantKey;
         TokenCount   = tokenCount;

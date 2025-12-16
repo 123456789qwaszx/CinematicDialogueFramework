@@ -9,10 +9,9 @@ using UnityEngine;
 /// 연출용 Command 파이프라인을 이어주는 Presenter.
 ///
 /// - DialogueSession 에서는 NodeViewModel 단위로 Present(vm)을 호출
-/// - 여기서는 vm을 DialogueLine으로 변환해서 ShowLineCommand 등 Command로 실행
+/// - 여기서는 vm.CommandSpecs를 기반으로 ISequenceCommand 리스트를 만들어 실행
 /// - 실제 화면 표현은 CommandServiceConfig 에서 주입된 DialogueViewAsset이 담당
-/// - ✅ 실행 모드 컨텍스트(DilogueContext)는 상태머신이 소유하고,
-///   CommandContext는 그걸 래핑해서 사용한다.
+/// - 실행 모드 컨텍스트(DialogueContext)는 상태머신이 소유, CommandContext는 래핑
 /// </summary>
 public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
 {
@@ -37,9 +36,7 @@ public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
 
         _services = new CommandService(commandServiceConfig);
         _player   = new SequencePlayer();
-
-        // ✅ _commandContext는 아직 생성하지 않는다.
-        // 실제 공유 DialogueContext가 넘어올 때 SyncFrom에서 생성한다.
+        // _commandContext는 실제 DialogueContext가 SyncFrom으로 넘어올 때 생성
     }
 
     private void OnDestroy()
@@ -48,16 +45,13 @@ public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
     }
 
     /// <summary>
-    /// 상태머신 쪽 Context를 Command 파이프라인과 공유하기 위한 메서드.
-    /// - 이전에는 값을 복사(Sync)만 했지만,
-    /// - 이제는 동일한 DialogueContext 인스턴스를 붙잡기만 한다.
+    /// 상태머신 쪽 DialogueContext를 Command 파이프라인과 공유.
     /// </summary>
     public void SyncFrom(DialogueContext ctx)
     {
         if (ctx == null)
             return;
 
-        // 처음 호출되면 CommandContext를 생성하면서 공유 Context를 래핑
         if (_commandContext == null)
         {
             _commandContext = new CommandContext(_services, ctx)
@@ -65,14 +59,12 @@ public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
                 Token = CancellationToken.None
             };
 
-            // TimeScale이 0 이하로 내려가는 걸 방지
             if (ctx.TimeScale <= 0f)
                 ctx.TimeScale = 1f;
 
             return;
         }
 
-        // 이미 있고, 다른 Context 인스턴스를 받았다면 새로 래핑
         if (!ReferenceEquals(_commandContext.DialogueContext, ctx))
         {
             var prevToken = _commandContext.Token;
@@ -97,26 +89,21 @@ public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
             return;
         }
 
-        // 이전 재생 중이던 커맨드가 있으면 정리
         StopCurrent();
 
-        // NodeViewModel -> DialogueLine 변환
-        DialogueLine line = BuildDialogueLineFrom(vm);
+        // NodeViewModel.CommandSpecs -> ISequenceCommand 리스트
+        List<ISequenceCommand> commands = BuildCommandsFrom(vm);
 
-        // 필요한 커맨드들을 조합 (1주차는 일단 한 줄 출력만)
-        var commands = new List<ISequenceCommand>
+        if (commands.Count == 0)
         {
-            new ShowLineCommand(line)
-            // TODO: 나중에 표정/포지션/상황에 따라 ShakeCameraCommand 등 추가
-        };
+            // 아무 커맨드도 없으면, PrimaryLine이 있다면 fallback으로 ShowLine 하나라도 실행
+            if (vm.PrimaryLine != null)
+                commands.Add(new ShowLineCommand(vm.PrimaryLine));
+        }
 
-        // CancellationToken 갱신
         ResetToken();
-
-        // CommandContext에 Token 적용
         _commandContext.Token = _cts.Token;
 
-        // Command 시퀀스 실행
         _currentRoutine = StartCoroutine(_player.PlayCommands(commands, _commandContext));
     }
 
@@ -130,7 +117,6 @@ public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
 
         StopCurrent();
 
-        // 간단하게 "System" 스피커로 한 줄 뿌려주는 형태로 처리
         DialogueLine line = new DialogueLine
         {
             speakerId  = "System",
@@ -152,10 +138,8 @@ public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
 
     public void Clear()
     {
-        // 진행 중인 커맨드 정리
         StopCurrent();
 
-        // 뷰를 완전히 비우고 싶다면, 빈 라인을 immediate로 한 번 뿌려버리는 것도 가능
         try
         {
             var empty = new DialogueLine
@@ -176,12 +160,43 @@ public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
 
     // ---- 내부 헬퍼 ----
 
-    private DialogueLine BuildDialogueLineFrom(NodeViewModel vm)
+    private List<ISequenceCommand> BuildCommandsFrom(NodeViewModel vm)
     {
-        // 상태머신 스펙에는 Expression/Position 정보가 없으니
-        // 1주차는 일단 기본값으로 채우고,
-        // 나중에 확장할 때 Branch/Variant 등을 보고 매핑할 수 있음.
-        return vm.Line;
+        var list = new List<ISequenceCommand>();
+
+        var specs = vm.CommandSpecs;
+        if (specs == null || specs.Count == 0)
+            return list;
+
+        for (int i = 0; i < specs.Count; i++)
+        {
+            NodeCommandSpec spec = specs[i];
+            if (spec == null) continue;
+
+            switch (spec.kind)
+            {
+                case NodeCommandKind.ShowLine:
+                {
+                    if (spec.line != null)
+                        list.Add(new ShowLineCommand(spec.line));
+                    break;
+                }
+
+                case NodeCommandKind.ShakeCamera:
+                {
+                    list.Add(new ShakeCameraCommand
+                    {
+                        strength = spec.shakeStrength,
+                        duration = spec.shakeDuration
+                    });
+                    break;
+                }
+
+                // TODO: 나중에 PlaySE, BGM, CutIn 등 추가하면 여기서 매핑
+            }
+        }
+
+        return list;
     }
 
     private void StopCurrent()
