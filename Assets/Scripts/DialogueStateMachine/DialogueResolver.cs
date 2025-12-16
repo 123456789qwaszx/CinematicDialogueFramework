@@ -1,41 +1,60 @@
 using System.Collections.Generic;
+using System.Linq;
 
 public sealed class DialogueResolver
 {
-    private readonly DialogueCatalog _catalog;
+    private readonly IDialogueRouteCatalog _routes;
 
-    public DialogueResolver(DialogueCatalog catalog)
+    public DialogueResolver(IDialogueRouteCatalog routes)
     {
-        _catalog = catalog;
+        _routes = routes;
     }
 
-    public (DialogueSituationSpec spec, DialogueRuntimeState state) ResolveNew(string situationKey)
+    public (SituationEntry situation, DialogueRuntimeState state) ResolveNew(string situationKey)
     {
-        DialogueSituationSpec situationSpec = _catalog.Get(situationKey);
-        if (situationSpec == null) return (null, null);
+        if (!_routes.TryGetRoute(situationKey, out var route))
+            return (null, null);
 
-        DialogueRuntimeState state = new ()
+        if (route.Sequence == null || string.IsNullOrEmpty(route.SituationId))
+            return (null, null);
+
+        SituationEntry situation = FindSituation(route.Sequence, route.SituationId);
+        if (situation == null || situation.nodes == null || situation.nodes.Count == 0)
+            return (null, null);
+
+        DialogueRuntimeState state = new()
         {
             SituationKey = situationKey,
-            BranchKey = "Default",
-            VariantKey = "Default",
-            NodeCursor = 0,
+            BranchKey    = "Default",
+            VariantKey   = "Default",
+            NodeCursor   = 0,
         };
 
-        ResolveCurrentNodeGate(situationSpec, state);
-        return (situationSpec, state);
+        ResolveCurrentNodeGate(situation, state);
+        return (situation, state);
     }
 
-    public void ResolveCurrentNodeGate(DialogueSituationSpec situationSpec, DialogueRuntimeState state)
+    private SituationEntry FindSituation(DialogueSequenceData seq, string situationId)
     {
-        state.Gate.Tokens = new List<GateToken>();
-        state.Gate.TokenCursor = 0;
-        state.Gate.InFlight = default;
+        if (seq == null || seq.situations == null)
+            return null;
 
-        if (state.NodeCursor < 0 || state.NodeCursor >= situationSpec.nodes.Count)
+        return seq.situations.FirstOrDefault(s =>
+            s != null &&
+            !string.IsNullOrEmpty(s.situationId) &&
+            s.situationId == situationId);
+    }
+
+    public void ResolveCurrentNodeGate(SituationEntry situation, DialogueRuntimeState state)
+    {
+        state.Gate.Tokens      = new List<GateToken>();
+        state.Gate.TokenCursor = 0;
+        state.Gate.InFlight    = default;
+
+        if (state.NodeCursor < 0 || situation.nodes == null || state.NodeCursor >= situation.nodes.Count)
             return;
 
-        var node = situationSpec.nodes[state.NodeCursor];
+        var node = situation.nodes[state.NodeCursor];
 
         if (node.gateTokens == null || node.gateTokens.Count == 0)
             state.Gate.Tokens.Add(GateToken.Immediately());
@@ -43,18 +62,43 @@ public sealed class DialogueResolver
             state.Gate.Tokens.AddRange(node.gateTokens);
     }
 
-    public NodeViewModel BuildNodeViewModel(DialogueSituationSpec situationSpec, DialogueRuntimeState state)
+    public NodeViewModel BuildNodeViewModel(SituationEntry situation, DialogueRuntimeState state)
     {
-        DialogueNodeSpec nodeSpec = situationSpec.nodes[state.NodeCursor];
+        DialogueNodeSpec nodeSpec = situation.nodes[state.NodeCursor];
+
+        IReadOnlyList<NodeCommandSpec> commandSpecs =
+            nodeSpec.commands != null
+                ? nodeSpec.commands
+                : System.Array.Empty<NodeCommandSpec>();
+
+        DialogueLine primaryLine = FindPrimaryLine(commandSpecs);
 
         return new NodeViewModel(
             state.SituationKey,
             state.NodeCursor,
-            nodeSpec.speakerId,
-            nodeSpec.text,
+            commandSpecs,
+            primaryLine,
             state.BranchKey,
             state.VariantKey,
             state.CurrentNodeTokenCount
         );
+    }
+
+    private static DialogueLine FindPrimaryLine(IReadOnlyList<NodeCommandSpec> specs)
+    {
+        if (specs == null) return null;
+
+        // 1) 첫 번째 ShowLine 커맨드 찾기
+        for (int i = 0; i < specs.Count; i++)
+        {
+            NodeCommandSpec spec = specs[i];
+            if (spec == null) continue;
+
+            if (spec.kind == NodeCommandKind.ShowLine && spec.line != null)
+                return spec.line;
+        }
+
+        // 2) 없어도 최소한 null 반환 (Presenter 쪽에서 방어)
+        return null;
     }
 }

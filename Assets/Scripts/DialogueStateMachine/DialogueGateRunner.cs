@@ -1,8 +1,15 @@
+using System;
+
 /// <summary>
 /// Pure logic that interprets GateTokens and decides "when we can advance".
 /// All rules for Auto / Skip / TimeScale / Delay / Signal are centralized here.
+///
+/// ✅ 중요한 원칙:
+/// - 진행을 막는 대기 조건은 오직 여기(GateRunner + GateToken)에만 존재한다.
+/// - View/Command 파이프라인은 오직 연출(타이핑/애니메이션)만 담당하고,
+///   "아직 연출 중인지"를 DialogueContext.IsNodeBusy로만 알려준다.
 /// </summary>
-public class DialogueGateRunner
+public class DialogueGateRunner : IDisposable
 {
     private readonly IInputSource _input;
     private readonly ITimeSource _time;
@@ -12,8 +19,8 @@ public class DialogueGateRunner
 
     public DialogueGateRunner(IInputSource input, ITimeSource time, ISignalBus signals)
     {
-        _input = input;
-        _time = time;
+        _input   = input;
+        _time    = time;
         _signals = signals;
         _signals.OnSignal += OnSignal;
     }
@@ -39,8 +46,12 @@ public class DialogueGateRunner
         if (state.Gate.Tokens == null || state.Gate.TokenCursor >= state.Gate.Tokens.Count)
             return false;
 
+        // ✅ 0) 노드 연출이 아직 재생 중이면, 어떤 토큰도 소비하지 않는다 (Skip 모드 제외)
+        if (ctx != null && ctx.IsNodeBusy && !ctx.IsSkipping)
+            return false;
+
         // Skip: consume all remaining tokens immediately
-        if (ctx.IsSkipping)
+        if (ctx != null && ctx.IsSkipping)
         {
             state.Gate.TokenCursor = state.Gate.Tokens.Count;
             state.Gate.InFlight = default;
@@ -74,7 +85,7 @@ public class DialogueGateRunner
 
     private bool TickInput(DialogueRuntimeState state, DialogueContext ctx)
     {
-        if (ctx.IsAutoMode)
+        if (ctx != null && ctx.IsAutoMode)
         {
             return TickAutoInput(state, ctx);
         }
@@ -119,7 +130,7 @@ public class DialogueGateRunner
         if (state.Gate.InFlight.RemainingSeconds <= 0f)
             state.Gate.InFlight.RemainingSeconds = seconds;
 
-        float dt = _time.UnscaledDeltaTime * (ctx.TimeScale <= 0f ? 0.01f : ctx.TimeScale);
+        float dt = _time.UnscaledDeltaTime * (ctx != null && ctx.TimeScale > 0f ? ctx.TimeScale : 0.01f);
         state.Gate.InFlight.RemainingSeconds -= dt;
 
         if (state.Gate.InFlight.RemainingSeconds <= 0f)
