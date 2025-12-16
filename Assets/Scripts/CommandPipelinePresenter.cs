@@ -12,6 +12,10 @@ using UnityEngine;
 /// - 여기서는 vm.CommandSpecs를 기반으로 ISequenceCommand 리스트를 만들어 실행
 /// - 실제 화면 표현은 CommandServiceConfig 에서 주입된 DialogueViewAsset이 담당
 /// - 실행 모드 컨텍스트(DialogueContext)는 상태머신이 소유, CommandContext는 래핑
+///
+/// ✅ 중요한 규칙:
+/// - 이 클래스는 "이 노드의 연출이 재생 중인지"만 DialogueContext.IsNodeBusy로 알려준다.
+/// - 다음 진행(입력/딜레이/신호 대기)은 전부 GateRunner가 GateToken으로만 결정.
 /// </summary>
 public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
 {
@@ -41,7 +45,7 @@ public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
 
     private void OnDestroy()
     {
-        DisposeToken();
+        StopCurrent();
     }
 
     /// <summary>
@@ -94,17 +98,22 @@ public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
         // NodeViewModel.CommandSpecs -> ISequenceCommand 리스트
         List<ISequenceCommand> commands = BuildCommandsFrom(vm);
 
-        if (commands.Count == 0)
+        if (commands.Count == 0 && vm.PrimaryLine != null)
         {
             // 아무 커맨드도 없으면, PrimaryLine이 있다면 fallback으로 ShowLine 하나라도 실행
-            if (vm.PrimaryLine != null)
-                commands.Add(new ShowLineCommand(vm.PrimaryLine));
+            commands.Add(new ShowLineCommand(vm.PrimaryLine));
+        }
+
+        if (commands.Count == 0)
+        {
+            // 진짜로 아무것도 없으면 busy를 켰다가 끌 이유도 없음
+            return;
         }
 
         ResetToken();
         _commandContext.Token = _cts.Token;
 
-        _currentRoutine = StartCoroutine(_player.PlayCommands(commands, _commandContext));
+        _currentRoutine = StartCoroutine(RunNodeCommands(commands));
     }
 
     public void PresentSystemMessage(string message)
@@ -133,7 +142,7 @@ public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
         ResetToken();
         _commandContext.Token = _cts.Token;
 
-        _currentRoutine = StartCoroutine(_player.PlayCommands(commands, _commandContext));
+        _currentRoutine = StartCoroutine(RunNodeCommands(commands));
     }
 
     public void Clear()
@@ -160,11 +169,31 @@ public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
 
     // ---- 내부 헬퍼 ----
 
+    /// <summary>
+    /// 한 노드의 커맨드 묶음을 재생하는 실제 코루틴.
+    /// - 시작 시 IsNodeBusy = true
+    /// - 끝나면 IsNodeBusy = false
+    /// </summary>
+    private IEnumerator RunNodeCommands(List<ISequenceCommand> commands)
+    {
+        var ctx = _commandContext;
+        if (ctx == null)
+            yield break;
+
+        // ✅ 노드 연출 시작: busy ON
+        ctx.IsNodeBusy = true;
+
+        yield return _player.PlayCommands(commands, ctx);
+
+        // ✅ 노드 연출 완료: busy OFF
+        ctx.IsNodeBusy = false;
+    }
+
     private List<ISequenceCommand> BuildCommandsFrom(NodeViewModel vm)
     {
-        var list = new List<ISequenceCommand>();
-
+        var list  = new List<ISequenceCommand>();
         var specs = vm.CommandSpecs;
+
         if (specs == null || specs.Count == 0)
             return list;
 
@@ -192,7 +221,7 @@ public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
                     break;
                 }
 
-                // TODO: 나중에 PlaySE, BGM, CutIn 등 추가하면 여기서 매핑
+                // TODO: PlaySE, BGM, CutIn 등 확장 시 여기서 매핑
             }
         }
 
@@ -207,7 +236,14 @@ public sealed class CommandPipelinePresenter : MonoBehaviour, IDialoguePresenter
             _currentRoutine = null;
         }
 
+        // 토큰 취소
         DisposeToken();
+
+        // 혹시 남아있을 수 있는 busy 플래그 안전하게 OFF
+        if (_commandContext != null)
+        {
+            _commandContext.IsNodeBusy = false;
+        }
     }
 
     private void ResetToken()

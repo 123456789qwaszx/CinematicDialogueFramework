@@ -15,7 +15,7 @@ public class CommandContext
     private readonly DialogueContext _dialogueContext;
 
     /// <summary>
-    /// 공용 실행 컨텍스트(스킵/오토/타임스케일)를 래핑한다.
+    /// 공용 실행 컨텍스트(스킵/오토/타임스케일/노드 busy)를 래핑한다.
     /// </summary>
     public DialogueContext DialogueContext => _dialogueContext;
 
@@ -68,6 +68,20 @@ public class CommandContext
         {
             if (_dialogueContext != null)
                 _dialogueContext.TimeScale = value;
+        }
+    }
+
+    /// <summary>
+    /// 현재 노드의 Command 파이프라인이 재생 중인지 여부.
+    /// - Presenter/SequencePlayer에서 제어
+    /// </summary>
+    public bool IsNodeBusy
+    {
+        get => _dialogueContext != null && _dialogueContext.IsNodeBusy;
+        set
+        {
+            if (_dialogueContext != null)
+                _dialogueContext.IsNodeBusy = value;
         }
     }
 
