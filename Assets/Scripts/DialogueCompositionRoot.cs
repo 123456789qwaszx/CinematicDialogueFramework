@@ -47,12 +47,13 @@ public sealed class DialogueCompositionRoot : MonoBehaviour
 
     private void Awake()
     {
-        // 0) (선택) Repository 초기화: 전역 데이터 창고 (Sequence / Speaker / Portrait)
-        if (initRepositoryOnAwake && DialogueRepository.Instance != null)
-        {
-            DialogueRepository.Instance.InitData();
-        }
-
+        // // 0) (선택) Repository 초기화: 전역 데이터 창고 (Sequence / Speaker / Portrait)
+        // if (initRepositoryOnAwake && DialogueRepository.Instance != null)
+        // {
+        //     DialogueRepository.Instance.InitData();
+        // }
+        DialogueRepository.Instance.InitData();
+        
         // 1) 필수 의존성 체크
         if (routeCatalog == null)
         {
@@ -112,7 +113,8 @@ public sealed class DialogueCompositionRoot : MonoBehaviour
     {
         if (autoStartOnAwake && !string.IsNullOrEmpty(startSituationKey))
         {
-            StartBySituationKey(startSituationKey);
+            //StartBySituationKey(startSituationKey);
+            StartBySituationKey("Intro");
         }
     }
 

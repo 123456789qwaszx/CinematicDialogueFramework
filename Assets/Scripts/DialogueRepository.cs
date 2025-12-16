@@ -14,7 +14,7 @@ public sealed class DialogueRepository : Singleton<DialogueRepository>
     [SerializeField] private bool showDebugInfo = true;
 
     [Header("Resources Path (Optional)")]
-    [SerializeField] private string sequenceResourcesPath = "Data/Dialogue/Sequence";
+    [SerializeField] private string sequenceResourcesPath = "Dialogue/Sequence";
     [SerializeField] private string speakerResourcesPath  = "Dialogue/Speaker";
 
     // ===== Data lookup =====
@@ -34,7 +34,7 @@ public sealed class DialogueRepository : Singleton<DialogueRepository>
         base.Awake();
         if (Instance != this) return; // 중복 인스턴스면 바로 리턴
 
-        InitData();
+        //InitData();
     }
 
     #endregion
