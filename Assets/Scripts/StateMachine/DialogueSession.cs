@@ -1,3 +1,5 @@
+using UnityEngine;
+
 public sealed class DialogueSession
 {
     private readonly DialogueResolver _resolver;
@@ -9,7 +11,7 @@ public sealed class DialogueSession
 
     private SituationSpec _situation;
     private DialogueRuntimeState _state;
-    
+
     public DialogueContext Context { get; } = new DialogueContext
     {
         IsAutoMode = false,
@@ -25,7 +27,7 @@ public sealed class DialogueSession
         NodeViewModelBuilder vmBuilder,
         IDialogueNodeOutput output,
         DialogueRouteCatalogSO routeCatalog
-        )
+    )
     {
         _resolver = resolver;
         _gatePlanner = gatePlanner;
@@ -34,19 +36,33 @@ public sealed class DialogueSession
         _output = output;
         _routeCatalog = routeCatalog;
     }
-    
 
+    private const string FallbackRouteKey = "Default";
     private DialogueRuntimeState CreateInitialState(string routeKey)
     {
-        DialogueRoute route = _routeCatalog.GetRoute(routeKey);
+        if (!_routeCatalog.TryGetRoute(routeKey, out DialogueRoute route))
+        {
+            if (!_routeCatalog.TryGetRoute(FallbackRouteKey, out route))
+            {
+                return null;
+            }
+        }
+
         return new DialogueRuntimeState
-            { SituationKey = route.SituationKey, BranchKey = "Default", VariantKey = "Default", NodeCursor = 0, };
+        {
+            RouteKey = routeKey,
+            SituationKey = route.SituationKey,
+            BranchKey = "Default",
+            VariantKey = "Default",
+            NodeCursor = 0,
+            Gate = default
+        };
     }
 
     public void StartDialogue(string routeKey)
     {
-        _situation = _resolver.Resolve(routeKey);
         _state = CreateInitialState(routeKey);
+        _situation = _resolver.Resolve(routeKey);
 
         _gatePlanner.BuildCurrentNodeGate(_situation, ref _state);
         EnterNode();
@@ -86,10 +102,12 @@ public sealed class DialogueSession
 
     private void EnterNode()
     {
-        var vm = _vmBuilder.Build(_situation, _state);
-        _output.Show(vm);
+        Debug.Log($"[Gate] tokens={_state.Gate.Tokens?.Count ?? -1}, cursor={_state.Gate.TokenCursor}");
 
-        var node = _situation.nodes[_state.NodeCursor];
+        NodeViewModel viewModel = _vmBuilder.Build(_situation, _state);
+        _output.Show(viewModel);
+
+        DialogueNodeSpec node = _situation.nodes[_state.NodeCursor];
         _output.Play(node, Context);
     }
 }

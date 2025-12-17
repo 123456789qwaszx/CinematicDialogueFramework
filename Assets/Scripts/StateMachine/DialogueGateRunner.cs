@@ -16,6 +16,7 @@ public class DialogueGateRunner : IDisposable
     private readonly ISignalBus _signals;
 
     private string _lastSignalKey;
+    //private readonly System.Collections.Generic.HashSet<string> _latchedSignals = new();
 
     public DialogueGateRunner(IInputSource input, ITimeSource time, ISignalBus signals)
     {
@@ -36,6 +37,11 @@ public class DialogueGateRunner : IDisposable
         // Actual key matching is handled during Tick
         _lastSignalKey = key;
     }
+    // private void OnSignal(string key)
+    // {
+    //     if (!string.IsNullOrEmpty(key))
+    //         _latchedSignals.Add(key);
+    // }
 
     /// <summary>
     /// Advances the current node's GateTokens as far as possible.
@@ -159,6 +165,19 @@ public class DialogueGateRunner : IDisposable
 
         return false;
     }
+    // private bool TickSignal(DialogueRuntimeState state, string expectedKey)
+    // {
+    //     state.Gate.InFlight.WaitingSignalKey = expectedKey;
+    //
+    //     if (!string.IsNullOrEmpty(expectedKey) && _latchedSignals.Remove(expectedKey))
+    //     {
+    //         state.Gate.InFlight.WaitingSignalKey = null;
+    //         ConsumeCurrent(state);
+    //         return true;
+    //     }
+    //
+    //     return false;
+    // }
 
     private static void ConsumeCurrent(DialogueRuntimeState state)
     {

@@ -1,0 +1,97 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e39f4c116589f104eb0d8510d5217462, type: 3}
+  m_Name: DialogueSequenceData
+  m_EditorClassIdentifier: Dialogue.Shared::DialogueSequenceData
+  sequenceId: Test
+  situations:
+  - situationKey: sit00
+    nodes:
+    - commands:
+      - kind: 0
+        line:
+          speakerId: Ami
+          expression: 1
+          text: 'Input:Space
+
+            Auto:A
+
+            Skip:K'
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gateTokens:
+      - type: 1
+        seconds: 1.5
+        signalKey: 
+    - commands:
+      - kind: 0
+        line:
+          speakerId: Ami
+          expression: 0
+          text: 888Alice/Input
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gateTokens:
+      - type: 1
+        seconds: 0.5
+        signalKey: 
+    - commands:
+      - kind: 1
+        line:
+          speakerId: Ami
+          expression: 0
+          text: 888Alice/Input
+          position: 0
+        shakeStrength: 3
+        shakeDuration: 1
+      - kind: 0
+        line:
+          speakerId: Ami
+          expression: 0
+          text: Delay1.5
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gateTokens:
+      - type: 2
+        seconds: 1.5
+        signalKey: 
+  - situationKey: qweqwe
+    nodes:
+    - commands:
+      - kind: 0
+        line:
+          speakerId: Ami
+          expression: 0
+          text: yamiYam
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gateTokens:
+      - type: 2
+        seconds: 3
+        signalKey: 
+    - commands:
+      - kind: 0
+        line:
+          speakerId: Ami
+          expression: 0
+          text: 888Alice
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gateTokens:
+      - type: 1
+        seconds: 0.5
+        signalKey: 

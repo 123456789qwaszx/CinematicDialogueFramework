@@ -35,6 +35,7 @@ public readonly struct DialogueRoute
 
 public interface IDialogueRouteCatalog
 {
+    bool TryGetRoute(string routeKey, out DialogueRoute route);
     DialogueRoute GetRoute(string routeKey);
 }
 
@@ -68,6 +69,29 @@ public sealed class DialogueRouteCatalogSO : ScriptableObject, IDialogueRouteCat
 
             _routeEntriesDict[entry.routeKey] = entry;
         }
+    }
+    
+    public bool TryGetRoute(string routeKey, out DialogueRoute route)
+    {
+        route = default;
+
+        if (string.IsNullOrWhiteSpace(routeKey))
+        {
+            Debug.LogWarning($"'{routeKey}': invalid input. routeKey is null/empty/whitespace.");
+            return false;
+        }
+
+        if (_routeEntriesDict == null)
+            Rebuild();
+
+        if (!_routeEntriesDict.TryGetValue(routeKey, out DialogueRouteEntry entry))
+        {
+            Debug.LogWarning($"routeKey not found: '{routeKey}'");
+            return false;
+        }
+
+        route = new DialogueRoute(entry);
+        return true;
     }
 
     public DialogueRoute GetRoute(string routeKey)

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
 public class ShowLineCommand : CommandBase
@@ -10,6 +11,7 @@ public class ShowLineCommand : CommandBase
 
     protected override IEnumerator ExecuteInner(CommandContext ctx)
     {
+        Debug.Log("ShowLineCommand");
         // if (ctx.IsSkipping)
         // {
         //     ctx.ShowLineImmediate(_line);

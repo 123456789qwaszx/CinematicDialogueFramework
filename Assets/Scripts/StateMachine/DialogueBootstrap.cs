@@ -7,17 +7,16 @@ public sealed class DialogueBootstrap : MonoBehaviour
 
     [Header("Ports / Adapters")]
     [SerializeField] private MonoBehaviour presenterBehaviour; // IDialoguePresenter
-    [SerializeField] private UnityInputSource input;
-    [SerializeField] private UnityTimeSource time;
+    [SerializeField] private MonoBehaviour commandExecuter; // INodeExecutor
     [SerializeField] private UnitySignalBus signals;
     
     [Header("Session / Runner")]
     private DialogueSession _session;
     private DialogueGateRunner _gateRunner;
     
-    //[Header("Starter")]
-    //private DialogueStarter _dialogueStarter;
-    //public DialogueStarter DialogueStarter => _dialogueStarter;
+    [Header("Starter")]
+    private DialogueStarter _dialogueStarter;
+    public DialogueStarter DialogueStarter => _dialogueStarter;
     
 
     private void Awake()
@@ -27,24 +26,43 @@ public sealed class DialogueBootstrap : MonoBehaviour
         NodeViewModelBuilder vmBuilder  = new ();
 
         // Compose runner (subscribes to signals)
+        UnityInputSource input        = new();
+        UnityTimeSource time          = new();
         DialogueGateRunner gateRunner = new DialogueGateRunner(input, time, signals);
 
         // Compose output port(s)
-        DialogueNodeOutputComposite output = new ((IDialoguePresenter)presenterBehaviour);
+        DialogueNodeOutputComposite output = new ((IDialoguePresenter)presenterBehaviour, (INodeExecutor)commandExecuter);
 
         DialogueSession session  = new (resolver, gatePlanner, gateRunner, vmBuilder, output, routeCatalog);
 
         _session = session;
         _gateRunner = gateRunner;
 
-        //_dialogueStarter = new DialogueStarter(_session);
+        _dialogueStarter = new DialogueStarter(_session);
     }
     
     
-    [SerializeField] private bool tickInUpdate = true;
+    [SerializeField] private bool enableDebugHotkeys = true;
+    
     private void Update()
     {
-        if (!tickInUpdate) return;
+        if (_session == null) return;
+
+        if (enableDebugHotkeys)
+        {
+            if (Input.GetKeyDown(KeyCode.A))
+            {
+                _session.Context.IsAutoMode = !_session.Context.IsAutoMode;
+                Debug.Log($"[Dialogue] AutoMode = {_session.Context.IsAutoMode}");
+            }
+
+            if (Input.GetKeyDown(KeyCode.K))
+            {
+                _session.Context.IsSkipping = !_session.Context.IsSkipping;
+                Debug.Log($"[Dialogue] IsSkipping = {_session.Context.IsSkipping}");
+            }
+        }
+        
         _session?.Tick();
     }
 

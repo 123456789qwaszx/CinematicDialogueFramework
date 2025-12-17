@@ -43,12 +43,26 @@ public class DialogueSequenceData : ScriptableObject
             _situationsDict[situation.situationKey] = situation;
         }
     }
-
-    public SituationSpec GetSituation(string situationKey)
+    
+    public bool TryGetSituation(string situationKey, out SituationSpec situation)
     {
+        situation = null;
+
+        if (string.IsNullOrWhiteSpace(situationKey))
+        {
+            Debug.LogWarning($"'{situationKey}': invalid input. situationKey is null/empty/whitespace.");
+            return false;
+        }
+
         if (_situationsDict == null)
             RebuildIndex();
 
-        return _situationsDict[situationKey];
+        if (!_situationsDict.TryGetValue(situationKey, out situation))
+        {
+            Debug.LogWarning($"situationKey not found: '{situationKey}'");
+            return false;
+        }
+
+        return true;
     }
 }

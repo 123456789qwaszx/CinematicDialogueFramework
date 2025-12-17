@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: DialogueRouteCatalog
   m_EditorClassIdentifier: Assembly-CSharp::DialogueRouteCatalogSO
   entries:
-  - situationKey: Intro
-    sequence: {fileID: 11400000, guid: 5aef68081465d804c9b15e9be8928cbf, type: 2}
-    situationId: Intro
+  - routeKey: Intro
+    sequenceData: {fileID: 11400000, guid: a852611cd4779c549aa3496115c119e5, type: 2}
+    situationKey: sit00

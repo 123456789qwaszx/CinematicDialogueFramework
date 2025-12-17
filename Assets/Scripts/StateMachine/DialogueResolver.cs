@@ -7,13 +7,22 @@ public class DialogueResolver
         _routes = routes;
     }
 
+    private const string FallbackRouteKey = "Default";
+    
     public SituationSpec Resolve(string routeKey)
     {
-        DialogueRoute route = _routes.GetRoute(routeKey);
+        _routes.TryGetRoute(routeKey, out DialogueRoute route);
+        //DialogueRoute route = _routes.GetRoute(routeKey);
         DialogueSequenceData sequence = route.Sequence;
         string situationKey = route.SituationKey;
 
-        SituationSpec situation = sequence.GetSituation(situationKey);
+        if (!sequence.TryGetSituation(situationKey, out SituationSpec situation))
+        {
+            if (!sequence.TryGetSituation(FallbackRouteKey, out situation))
+            {
+                return null;
+            }
+        }
 
         return situation;
     }
