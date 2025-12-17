@@ -49,12 +49,12 @@ public sealed class DialogueCompositionRoot : MonoBehaviour
 
         DialogueResolver resolver = new (routeCatalog);
         _gateRunner  = new DialogueGateRunner(_input, _time, signalBus);
-        _session     = new DialogueSession(resolver, _gateRunner, _presenter);
+        //_session     = new DialogueSession(resolver, _gateRunner, _presenter);
 
-        if (_presenter is CommandPipelinePresenter cpp)
-        {
-            cpp.SyncFrom(_session.Context);
-        }
+        // if (_presenter is CommandPipelinePresenter cpp)
+        // {
+        //     cpp.SyncFrom(_session.Context);
+        // }
     }
 
     private void Start()
@@ -85,10 +85,10 @@ public sealed class DialogueCompositionRoot : MonoBehaviour
         else
         {
             // CommandPipelinePresenter 사용 중이면 Context 최신 상태로 다시 Sync
-            if (_presenter is CommandPipelinePresenter cpp)
-            {
-                cpp.SyncFrom(_session.Context);
-            }
+            // if (_presenter is CommandPipelinePresenter cpp)
+            // {
+            //     cpp.SyncFrom(_session.Context);
+            // }
         }
     }
 
@@ -113,10 +113,10 @@ public sealed class DialogueCompositionRoot : MonoBehaviour
         }
 
         // CommandPipelinePresenter라면 매 프레임 Context Sync
-        if (_presenter is CommandPipelinePresenter cpp)
-        {
-            cpp.SyncFrom(_session.Context);
-        }
+        // if (_presenter is CommandPipelinePresenter cpp)
+        // {
+        //     cpp.SyncFrom(_session.Context);
+        // }
 
         // ✅ 실행 루프는 오직 여기에서만: 상태머신 한 번 Tick
         _session.Tick();

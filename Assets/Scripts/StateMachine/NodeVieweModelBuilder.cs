@@ -2,22 +2,18 @@ using System.Collections.Generic;
 
 public class NodeViewModelBuilder
 {
-    public NodeViewModel BuildNodeViewModel(SituationSpec situation, DialogueRuntimeState state)
+    public NodeViewModel Build(SituationSpec situation, DialogueRuntimeState state)
     {
-        DialogueNodeSpec nodeSpec = situation.nodes[state.NodeCursor];
-
-        IReadOnlyList<NodeCommandSpec> commandSpecs =
-            nodeSpec.commands != null
-                ? nodeSpec.commands
-                : System.Array.Empty<NodeCommandSpec>();
-
-        DialogueLine primaryLine = FindPrimaryLine(commandSpecs);
+        var node = situation.nodes[state.NodeCursor];
+        var line = FindPrimaryLine(node.commands);
 
         return new NodeViewModel(
             state.SituationKey,
             state.NodeCursor,
-            commandSpecs,
-            primaryLine,
+            line?.speakerId ?? string.Empty,
+            line?.text ?? string.Empty,
+            line?.expression ?? Expression.Default,
+            line?.position ?? DialoguePosition.Left,
             state.BranchKey,
             state.VariantKey,
             state.CurrentNodeTokenCount
@@ -28,18 +24,12 @@ public class NodeViewModelBuilder
     {
         if (specs == null) return null;
 
-        // 1) 첫 번째 ShowLine 커맨드 찾기
         for (int i = 0; i < specs.Count; i++)
         {
-            NodeCommandSpec spec = specs[i];
-            if (spec == null) continue;
-
-            if (spec.kind == NodeCommandKind.ShowLine && spec.line != null)
+            var spec = specs[i];
+            if (spec != null && spec.kind == NodeCommandKind.ShowLine && spec.line != null)
                 return spec.line;
         }
-
-        // 2) 없어도 최소한 null 반환 (Presenter 쪽에서 방어)
         return null;
     }
 }
-

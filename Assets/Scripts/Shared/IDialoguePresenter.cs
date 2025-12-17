@@ -15,6 +15,12 @@ public interface IDialoguePresenter
     void Clear();
 }
 
+public interface INodeExecutor
+{
+    void Play(DialogueNodeSpec node, DialogueContext ctx, DialogueLine fallbackLine = null);
+    void Stop();
+}
+
 /// <summary>
 /// Input port for "advance" actions (e.g., click / key press / tap).
 /// The core queries this each frame and consumes the input when read,

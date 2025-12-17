@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class DialogueSession
@@ -14,18 +15,24 @@ public class DialogueSession
     private readonly DialogueGatePlanner _gatePlanner;
     private readonly DialogueGateRunner _gateRunner;
     private readonly IDialoguePresenter _presenter;
+    private readonly NodeViewModelBuilder _nodeViewModelBuilder;
 
     private SituationSpec _situation;
     private DialogueRuntimeState _state;
     
     private readonly IDialogueRouteCatalog _routes;
 
-    public DialogueSession(DialogueResolver resolver, DialogueGatePlanner gatePlanner, DialogueGateRunner gateRunner, IDialoguePresenter presenter)
+    public DialogueSession(DialogueResolver resolver,
+        DialogueGatePlanner gatePlanner,
+        DialogueGateRunner gateRunner,
+        IDialoguePresenter presenter,
+        NodeViewModelBuilder nodeViewModelBuilder)
     {
         _resolver   = resolver;
         _gatePlanner = gatePlanner;
         _gateRunner = gateRunner;
         _presenter  = presenter;
+        _nodeViewModelBuilder = nodeViewModelBuilder;
 
         Context = new DialogueContext
         {
@@ -122,10 +129,14 @@ public class DialogueSession
 
     private void EnterNode()
     {
-        // var vm = _resolver.BuildNodeViewModel(_situation, _state);
-        // _presenter.Present(vm);
-        // OnNodeEntered?.Invoke(vm);
-        // OnTokenProgress?.Invoke(_state.Gate.TokenCursor, _state.CurrentNodeTokenCount);
+        NodeViewModel vm =_nodeViewModelBuilder.Build(_situation, _state);
+        _presenter.Present(vm);
+        
+        DialogueNodeSpec node = _situation.nodes[_state.NodeCursor];
+        List<NodeCommandSpec> commands = node.commands; // CommandRunner가 실행
+        
+        OnNodeEntered?.Invoke(vm);
+        OnTokenProgress?.Invoke(_state.Gate.TokenCursor, _state.CurrentNodeTokenCount);
     }
 
     public DialogueSaveState ExportSave()
