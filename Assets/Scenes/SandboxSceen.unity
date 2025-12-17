@@ -972,15 +972,13 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1251215347}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ee34c2bfb393bb04b9176b1a11feb377, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DialogueCompositionRoot
   routeCatalog: {fileID: 11400000, guid: 4ccfb75bb8d02dd488dabd3881e57edf, type: 2}
-  presenterBehaviour: {fileID: 279543600}
   signalBus: {fileID: 1945730144}
-  nextButton: {fileID: 0}
   autoStartOnAwake: 1
   startSituationKey: Intro
   enableDebugHotkeys: 1

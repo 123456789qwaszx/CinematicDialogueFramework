@@ -13,7 +13,7 @@ public class DialogueSession
     private readonly DialogueGateRunner _gateRunner;
     private readonly IDialoguePresenter _presenter;
 
-    private SituationEntry _situation;
+    private SituationSpec _situation;
     private DialogueRuntimeState _state;
 
     public DialogueSession(DialogueResolver resolver, DialogueGateRunner gateRunner, IDialoguePresenter presenter)
@@ -33,8 +33,7 @@ public class DialogueSession
 
     public bool Start(string situationKey)
     {
-        var (situation, state) = _resolver.ResolveNew(situationKey);
-        if (situation == null || state == null) return false;
+        var (situation, state) = _resolver.Resolve(situationKey);
 
         _situation = situation;
         _state     = state;
@@ -123,7 +122,7 @@ public class DialogueSession
 
     public bool ImportSave(DialogueSaveState save)
     {
-        var (situation, state) = _resolver.ResolveNew(save.SituationKey);
+        var (situation, state) = _resolver.Resolve(save.SituationKey);
         if (situation == null || state == null) return false;
 
         _situation = situation;

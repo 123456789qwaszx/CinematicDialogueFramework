@@ -2,40 +2,40 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 전역 SituationKey -> (어떤 SequenceData의 어떤 Situation인지) 매핑.
-/// 실행 모드는 이제 전부 StateMachine + Presenter 조합으로 통일.
-/// </summary>
+// Inspector-serialized entry (authoring data)
 [Serializable]
-public sealed class DialogueRouteEntry
+public class DialogueRouteEntry
 {
     [Header("Global Key")]
-    public string situationKey; // 외부에서 사용할 전역 키
+    public string routeKey;
 
     [Header("Data")]
-    public DialogueSequenceData sequence;
-    public string situationId; // sequence 내 SituationEntry.situationId
+    public DialogueSequenceData sequenceData;
+    public string situationKey;
 }
 
+// Immutable runtime snapshot
 public readonly struct DialogueRoute
 {
-    public readonly string SituationKey;
+    public readonly string RouteKey;
     public readonly DialogueSequenceData Sequence;
-    public readonly string SituationId;
+    /// <summary>
+    /// Situation key to start from within the selected sequence.
+    /// Must match (SituationSpec).situationKey.
+    /// </summary>
+    public readonly string SituationKey;
 
-    public string SequenceId => Sequence != null ? Sequence.sequenceId : null;
-
-    public DialogueRoute(DialogueRouteEntry e)
+    public DialogueRoute(DialogueRouteEntry entry)
     {
-        SituationKey = e.situationKey;
-        Sequence     = e.sequence;
-        SituationId  = e.situationId;
+        RouteKey     = entry.routeKey;
+        Sequence     = entry.sequenceData;
+        SituationKey  = entry.situationKey;
     }
 }
 
 public interface IDialogueRouteCatalog
 {
-    bool TryGetRoute(string situationKey, out DialogueRoute route);
+    DialogueRoute GetRoute(string routeKey);
 }
 
 [CreateAssetMenu(fileName = "DialogueRouteCatalog", menuName = "Dialogue/Route Catalog")]
@@ -43,8 +43,8 @@ public sealed class DialogueRouteCatalogSO : ScriptableObject, IDialogueRouteCat
 {
     [SerializeField] private List<DialogueRouteEntry> entries = new();
 
-    private Dictionary<string, DialogueRouteEntry> _byKey;
-
+    private Dictionary<string, DialogueRouteEntry> _routeEntriesDict;
+    
     private void OnEnable()
     {
         Rebuild();
@@ -56,33 +56,27 @@ public sealed class DialogueRouteCatalogSO : ScriptableObject, IDialogueRouteCat
         Rebuild();
     }
 #endif
-
+    
     private void Rebuild()
     {
-        _byKey = new Dictionary<string, DialogueRouteEntry>(StringComparer.Ordinal);
+        _routeEntriesDict = new Dictionary<string, DialogueRouteEntry>(StringComparer.Ordinal);
 
-        foreach (var e in entries)
+        foreach (DialogueRouteEntry entry in entries)
         {
-            if (e == null) continue;
-            if (string.IsNullOrWhiteSpace(e.situationKey)) continue;
+            if (entry == null) continue;
+            if (string.IsNullOrWhiteSpace(entry.routeKey)) continue;
 
-            _byKey[e.situationKey] = e; // 마지막 값 우선
+            _routeEntriesDict[entry.routeKey] = entry;
         }
     }
 
-    public bool TryGetRoute(string situationKey, out DialogueRoute route)
+    public DialogueRoute GetRoute(string routeKey)
     {
-        route = default;
-
-        if (_byKey == null) Rebuild();
-        if (string.IsNullOrWhiteSpace(situationKey)) return false;
-
-        if (_byKey.TryGetValue(situationKey, out var entry) && entry != null)
-        {
-            route = new DialogueRoute(entry);
-            return true;
-        }
-
-        return false;
+        if (_routeEntriesDict == null)
+            Rebuild();
+        
+        DialogueRouteEntry entry = _routeEntriesDict[routeKey];
+        
+        return new DialogueRoute(entry);
     }
 }

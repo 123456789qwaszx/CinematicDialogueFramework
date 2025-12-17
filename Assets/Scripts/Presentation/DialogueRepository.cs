@@ -127,7 +127,7 @@ public sealed class DialogueRepository : Singleton<DialogueRepository>
     public bool TryGetSequence(string sequenceId, out DialogueSequenceData sequence)
         => _sequencesById.TryGetValue(sequenceId, out sequence);
 
-    public bool TryGetSituation(string sequenceId, string situationId, out SituationEntry situation)
+    public bool TryGetSituation(string sequenceId, string situationId, out SituationSpec situation)
     {
         situation = null;
         if (!_sequencesById.TryGetValue(sequenceId, out DialogueSequenceData seq) || seq == null)
@@ -137,7 +137,7 @@ public sealed class DialogueRepository : Singleton<DialogueRepository>
             return false;
 
         situation = seq.situations
-            .FirstOrDefault(s => s != null && s.situationId == situationId);
+            .FirstOrDefault(s => s != null && s.situationKey == situationId);
         return situation != null;
     }
 
