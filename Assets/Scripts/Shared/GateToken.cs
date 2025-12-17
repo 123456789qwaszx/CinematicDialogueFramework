@@ -29,7 +29,7 @@ public struct GateToken
     public float Seconds;
 
     // For Signal
-    public string SignalKey;
+    public string SignalKey; // null/빈문자/공백(" ") 무시
 
     public static GateToken Immediately() => new() { Type = GateTokenType.Immediately };
     public static GateToken Input() => new() { Type = GateTokenType.Input };

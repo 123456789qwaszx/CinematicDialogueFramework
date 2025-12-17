@@ -10,9 +10,6 @@ public readonly struct NodeViewModel
     public readonly string SituationKey;
     public readonly int NodeIndex;
 
-    /// <summary>
-    /// 이 노드를 구성하는 커맨드 스펙 묶음
-    /// </summary>
     public readonly IReadOnlyList<NodeCommandSpec> CommandSpecs;
 
     /// <summary>

@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 public class DialogueSession
 {
@@ -10,15 +11,19 @@ public class DialogueSession
     public DialogueContext Context;
 
     private readonly DialogueResolver _resolver;
+    private readonly DialogueGatePlanner _gatePlanner;
     private readonly DialogueGateRunner _gateRunner;
     private readonly IDialoguePresenter _presenter;
 
     private SituationSpec _situation;
     private DialogueRuntimeState _state;
+    
+    private readonly IDialogueRouteCatalog _routes;
 
-    public DialogueSession(DialogueResolver resolver, DialogueGateRunner gateRunner, IDialoguePresenter presenter)
+    public DialogueSession(DialogueResolver resolver, DialogueGatePlanner gatePlanner, DialogueGateRunner gateRunner, IDialoguePresenter presenter)
     {
         _resolver   = resolver;
+        _gatePlanner = gatePlanner;
         _gateRunner = gateRunner;
         _presenter  = presenter;
 
@@ -30,13 +35,30 @@ public class DialogueSession
             AutoAdvanceDelay = 0.6f
         };
     }
-
-    public bool Start(string situationKey)
+    
+    private DialogueRuntimeState CreateInitialState(string routeKey)
     {
-        var (situation, state) = _resolver.Resolve(situationKey);
+        DialogueRoute route = _routes.GetRoute(routeKey);
+        
+        return new DialogueRuntimeState
+        {
+            SituationKey = route.SituationKey,
 
+            BranchKey    = "Default",
+            VariantKey   = "Default",
+            NodeCursor   = 0,
+        };
+    }
+
+    public bool Start(string routeKey)
+    {
+        DialogueRuntimeState state = CreateInitialState(routeKey);
+        SituationSpec situation = _resolver.Resolve(routeKey);
+        
+        _state = state;
         _situation = situation;
-        _state     = state;
+        
+        _gatePlanner.BuildCurrentNodeGate(_situation, ref _state);
 
         EnterNode();
         return true;
@@ -92,7 +114,7 @@ public class DialogueSession
                 return;
             }
 
-            _resolver.ResolveCurrentNodeGate(_situation, _state);
+            _gatePlanner.BuildCurrentNodeGate(_situation, ref _state);
             EnterNode();
             progressed = true;
         }
@@ -100,10 +122,10 @@ public class DialogueSession
 
     private void EnterNode()
     {
-        var vm = _resolver.BuildNodeViewModel(_situation, _state);
-        _presenter.Present(vm);
-        OnNodeEntered?.Invoke(vm);
-        OnTokenProgress?.Invoke(_state.Gate.TokenCursor, _state.CurrentNodeTokenCount);
+        // var vm = _resolver.BuildNodeViewModel(_situation, _state);
+        // _presenter.Present(vm);
+        // OnNodeEntered?.Invoke(vm);
+        // OnTokenProgress?.Invoke(_state.Gate.TokenCursor, _state.CurrentNodeTokenCount);
     }
 
     public DialogueSaveState ExportSave()
@@ -122,8 +144,16 @@ public class DialogueSession
 
     public bool ImportSave(DialogueSaveState save)
     {
-        var (situation, state) = _resolver.Resolve(save.SituationKey);
-        if (situation == null || state == null) return false;
+        DialogueRuntimeState state = CreateInitialState(save.RouteKey);
+        SituationSpec situation = _resolver.Resolve(save.RouteKey);
+        _gatePlanner.BuildCurrentNodeGate(_situation, ref _state);
+        
+        
+        if (situation == null || state == null)
+        {
+            Debug.Log("Import SaveData Failed");
+            return false;
+        }
 
         _situation = situation;
         _state     = state;
@@ -131,8 +161,8 @@ public class DialogueSession
         _state.BranchKey  = save.BranchKey;
         _state.VariantKey = save.VariantKey;
         _state.NodeCursor = save.NodeCursor;
-
-        _resolver.ResolveCurrentNodeGate(_situation, _state);
+        
+        _gatePlanner.BuildCurrentNodeGate(_situation, ref _state);
 
         _state.Gate.TokenCursor               = save.TokenCursor;
         _state.Gate.InFlight.RemainingSeconds = save.RemainingSeconds;

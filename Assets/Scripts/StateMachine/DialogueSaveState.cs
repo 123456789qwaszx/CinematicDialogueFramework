@@ -8,6 +8,7 @@ using System;
 [Serializable]
 public struct DialogueSaveState
 {
+    public string RouteKey;
     public string SituationKey;
     public string BranchKey;
     public string VariantKey;
