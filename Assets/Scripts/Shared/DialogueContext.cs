@@ -19,7 +19,7 @@ public sealed class DialogueContext
     // AutoMode일 때 Input 토큰 자동 진행 딜레이
     public float AutoAdvanceDelay = 0.6f;
 
-    // ✅ 현재 노드의 연출(Command 파이프라인)이 아직 진행 중인지
+    // 현재 노드의 연출(Command 파이프라인)이 아직 진행 중인지
     // - true이면 GateRunner는 어떤 GateToken도 소비하지 않는다 (Skip 모드 제외)
     public bool IsNodeBusy;
 }

@@ -1,4 +1,5 @@
 using System;
+using UnityEngine.Serialization;
 
 public enum GateTokenType
 {
@@ -23,16 +24,16 @@ public enum GateTokenType
 [Serializable]
 public struct GateToken
 {
-    public GateTokenType Type;
+    public GateTokenType type;
 
     // For Delay
-    public float Seconds;
+    public float seconds;
 
     // For Signal
-    public string SignalKey; // null/빈문자/공백(" ") 무시
+    public string signalKey; // null/빈문자/공백(" ") 무시
 
-    public static GateToken Immediately() => new() { Type = GateTokenType.Immediately };
-    public static GateToken Input() => new() { Type = GateTokenType.Input };
-    public static GateToken Delay(float seconds) => new() { Type = GateTokenType.Delay, Seconds = seconds };
-    public static GateToken Signal(string key) => new() { Type = GateTokenType.Signal, SignalKey = key };
+    public static GateToken Immediately() => new() { type = GateTokenType.Immediately };
+    public static GateToken Input() => new() { type = GateTokenType.Input };
+    public static GateToken Delay(float seconds) => new() { type = GateTokenType.Delay, seconds = seconds };
+    public static GateToken Signal(string key) => new() { type = GateTokenType.Signal, signalKey = key };
 }

@@ -11,7 +11,7 @@ public class DialogueGatePlanner
         if (state.NodeCursor >= situation.nodes.Count)
         {// End-of-situation
             state.Gate.Tokens.Add(GateToken.Immediately());
-            state.Gate.TokenCursor = 0; // completed
+            state.Gate.TokenCursor = 0;
             return;
         }
 

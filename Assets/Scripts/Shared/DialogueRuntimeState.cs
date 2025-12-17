@@ -10,6 +10,7 @@ using System.Collections.Generic;
 public sealed class DialogueRuntimeState
 {
     // 1) Identity / Route (Resolver output)
+    public string RouteKey;
     public string SituationKey; // Which Situation (=Screen) this state belongs to (required)
     public string BranchKey; // Which decision branch was taken (required or "" allowed)
     public string VariantKey; // Selected variant within the branch (required or "Default")

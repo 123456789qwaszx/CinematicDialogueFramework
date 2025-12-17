@@ -36,7 +36,7 @@ public interface IInputSource
 /// <summary>
 /// Time port used by the core to drive time-based gates (e.g., Delay tokens).
 /// Exposes unscaled delta time so dialogue progression remains consistent
-/// even when the game's time scale is modified.
+/// even when the game's timeScale is modified.
 /// </summary>
 public interface ITimeSource
 {
