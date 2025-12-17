@@ -15,7 +15,7 @@ public class DialogueGateRunner : IDisposable
     private readonly ITimeSource _time;
     private readonly ISignalBus _signals;
 
-    private bool _signalMatched;
+    private string _lastSignalKey;
 
     public DialogueGateRunner(IInputSource input, ITimeSource time, ISignalBus signals)
     {
@@ -30,10 +30,11 @@ public class DialogueGateRunner : IDisposable
         _signals.OnSignal -= OnSignal;
     }
 
+    
     private void OnSignal(string key)
     {
         // Actual key matching is handled during Tick
-        _signalMatched = true;
+        _lastSignalKey = key;
     }
 
     /// <summary>
@@ -63,7 +64,7 @@ public class DialogueGateRunner : IDisposable
 
         var token = tokenOpt.Value;
 
-        switch (token.Type)
+        switch (token.type)
         {
             case GateTokenType.Immediately:
                 ConsumeCurrent(state);
@@ -73,10 +74,10 @@ public class DialogueGateRunner : IDisposable
                 return TickInput(state, ctx);
 
             case GateTokenType.Delay:
-                return TickDelay(state, ctx, token.Seconds);
+                return TickDelay(state, ctx, token.seconds);
 
             case GateTokenType.Signal:
-                return TickSignal(state, token.SignalKey);
+                return TickSignal(state, token.signalKey);
 
             default:
                 return false;
@@ -143,20 +144,17 @@ public class DialogueGateRunner : IDisposable
         return false;
     }
 
-    private bool TickSignal(DialogueRuntimeState state, string key)
+
+    private bool TickSignal(DialogueRuntimeState state, string expectedKey)
     {
-        state.Gate.InFlight.WaitingSignalKey = key;
+        state.Gate.InFlight.WaitingSignalKey = expectedKey;
 
-        if (_signalMatched)
+        if (_lastSignalKey == expectedKey)
         {
-            _signalMatched = false;
-
-            if (state.Gate.InFlight.WaitingSignalKey == key)
-            {
-                state.Gate.InFlight.WaitingSignalKey = null;
-                ConsumeCurrent(state);
-                return true;
-            }
+            _lastSignalKey = null;
+            state.Gate.InFlight.WaitingSignalKey = null;
+            ConsumeCurrent(state);
+            return true;
         }
 
         return false;
