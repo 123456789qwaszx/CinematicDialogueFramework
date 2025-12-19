@@ -9,14 +9,9 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
 {
     [Header("Trace")]
     [SerializeField] private bool enableTrace = true;
-
-    // 1) Trace가 추가될 때마다 Debug.Log로 스트리밍 출력
     [SerializeField] private bool logTraceStreaming = false;
-
-    // 2) 노드 종료/Stop 시점에 전체 Trace를 한번에 덤프
     [SerializeField] private bool logTraceDumpOnNodeEnd = true;
 
-    // Inspector에서 확인용(선택)
     [SerializeField, TextArea(3, 20)] private string tracePreview;
 
     private readonly StringBuilder _trace = new StringBuilder(4096);
@@ -44,27 +39,45 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
     private void OnDisable() => Stop();
     private void OnDestroy() => Stop();
 
+    /// <summary>
+    /// Compatibility: 기존 호출부가 아직 "노드 단위"로 Play를 부르는 경우를 위해 유지.
+    /// Step 구조로 바뀐 이후에는 보통 PlayStep(node, stepIndex, ...)를 쓰는 게 맞다.
+    /// </summary>
     public void Play(DialogueNodeSpec node, NodePlayScope scope, DialogueLine fallbackLine = null)
+    {
+        // 기본 동작을 "Step 0 재생"으로 두면, 최소한 이전 흐름이 완전히 죽진 않음.
+        // (올바른 흐름은 호출부에서 현재 stepIndex를 넘겨 PlayStep을 호출하는 것)
+        PlayStep(node, stepIndex: 0, scope: scope, fallbackLine: fallbackLine);
+    }
+
+    /// <summary>
+    /// ✅ Step 기반 재생: 현재 step의 commands만 실행한다.
+    /// </summary>
+    public void PlayStep(DialogueNodeSpec node, int stepIndex, NodePlayScope scope, DialogueLine fallbackLine = null)
     {
         if (!_isInitialized)
         {
             Debug.LogError("[CommandExecutor] Play called before Initialize().", this);
             return;
         }
+
         if (node == null || scope == null) return;
 
         Stop();
-        ClearTrace(); // ✅ 새 노드 시작할 때 trace 초기화(원치 않으면 지워도 됨)
+        ClearTrace();
 
-        var commands = BuildCommandsFrom(node);
+        var commands = BuildCommandsFromStep(node, stepIndex);
 
         if ((commands == null || commands.Count == 0) && fallbackLine != null)
             commands = new List<ISequenceCommand> { new ShowLineCommand(fallbackLine) };
 
         if (commands == null || commands.Count == 0)
+        {
+            Trace($"Step Play skipped: stepIndex={stepIndex} (no commands)");
             return;
+        }
 
-        Trace($"Node Play: commands={commands.Count}");
+        Trace($"Step Play: stepIndex={stepIndex}, commands={commands.Count}");
 
         _activeScope = scope;
 
@@ -150,10 +163,12 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         }
     }
 
-    private List<ISequenceCommand> BuildCommandsFrom(DialogueNodeSpec node)
+    private List<ISequenceCommand> BuildCommandsFromStep(DialogueNodeSpec node, int stepIndex)
     {
         var list = new List<ISequenceCommand>();
-        if (node == null || node.commands == null) return list;
+
+        if (node == null || node.steps == null || node.steps.Count == 0)
+            return list;
 
         if (_commandFactory == null)
         {
@@ -161,7 +176,17 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
             return list;
         }
 
-        foreach (var spec in node.commands)
+        if (stepIndex < 0 || stepIndex >= node.steps.Count)
+        {
+            Trace($"Invalid stepIndex: {stepIndex} (steps={node.steps.Count})");
+            return list;
+        }
+
+        var step = node.steps[stepIndex];
+        if (step == null || step.commands == null || step.commands.Count == 0)
+            return list;
+
+        foreach (var spec in step.commands)
         {
             if (spec == null) continue;
 
@@ -197,8 +222,6 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
     private void DumpTraceToConsole(string header)
     {
         if (!enableTrace) return;
-
-        // Debug.Log는 길이 제한/가독성 문제가 있으니 헤더와 함께 한 번만 출력
         Debug.Log($"{header}\n{_trace}", this);
     }
 

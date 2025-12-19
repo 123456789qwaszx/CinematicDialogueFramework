@@ -34,4 +34,23 @@ public readonly struct NodeViewModel
         VariantKey   = variantKey;
         TokenCount   = tokenCount;
     }
+
+    public static NodeViewModel System(
+        string situationKey,
+        int nodeIndex,
+        string message,
+        int tokenCount = 0)
+    {
+        return new NodeViewModel(
+            situationKey: situationKey ?? "(none)",
+            nodeIndex: nodeIndex,
+            speakerId: "System",
+            text: message ?? string.Empty,
+            expression: Expression.Default,
+            position: DialoguePosition.Left,
+            branchKey: "Default",
+            variantKey: "Default",
+            tokenCount: tokenCount
+        );
+    }
 }
