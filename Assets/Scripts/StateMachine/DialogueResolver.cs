@@ -11,8 +11,14 @@ public class DialogueResolver
     
     public SituationSpec Resolve(string routeKey)
     {
-        _routes.TryGetRoute(routeKey, out DialogueRoute route);
-        //DialogueRoute route = _routes.GetRoute(routeKey);
+        if (!_routes.TryGetRoute(routeKey, out DialogueRoute route))
+        {
+            if (!_routes.TryGetRoute(FallbackRouteKey, out route))
+            {
+                return null;
+            }
+        }
+        
         DialogueSequenceData sequence = route.Sequence;
         string situationKey = route.SituationKey;
 

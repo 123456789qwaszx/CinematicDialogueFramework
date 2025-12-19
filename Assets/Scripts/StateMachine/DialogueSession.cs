@@ -69,7 +69,18 @@ public sealed class DialogueSession
     public void StartDialogue(string routeKey)
     {
         _state = CreateInitialState(routeKey);
+        
+        if (_state == null)
+        {
+            Debug.LogWarning($"StartDialogue failed. Invalid routeKey='{routeKey}");
+            return;
+        }
         _situation = _resolver.Resolve(routeKey);
+        if (_situation == null)
+        {
+            Debug.LogWarning($"Missing SituationSpec. situationKey='{_state.SituationKey}', routeKey='{_state.RouteKey}'");
+            return;
+        }
         
         if (_nodeScope == null || !ReferenceEquals(_nodeScope.Playback, Context))
             _nodeScope = new NodePlayScope(_commandService, Context);

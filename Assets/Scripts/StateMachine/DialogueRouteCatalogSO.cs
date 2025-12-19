@@ -6,7 +6,7 @@ using UnityEngine;
 [Serializable]
 public class DialogueRouteEntry
 {
-    [Header("Global Key")]
+    [Header("Route ID (read-only at runtime)")]
     public string routeKey;
 
     [Header("Data")]
