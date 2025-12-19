@@ -4,6 +4,7 @@ public sealed class DialogueBootstrap : MonoBehaviour
 {
     [Header("Data")]
     [SerializeField] private DialogueRouteCatalogSO routeCatalog;
+    [SerializeField] private CommandServiceConfig commandServiceConfig;
 
     [Header("Ports / Adapters")]
     [SerializeField] private MonoBehaviour presenterBehaviour; // IDialoguePresenter
@@ -30,10 +31,18 @@ public sealed class DialogueBootstrap : MonoBehaviour
         UnityTimeSource time          = new();
         DialogueGateRunner gateRunner = new DialogueGateRunner(input, time, signals);
 
-        // Compose output port(s)
+        // Optional extension ports
+        CommandService service = new CommandService(commandServiceConfig);
+        CommandExecutor executor = commandExecuter as CommandExecutor;
+        SequencePlayer sequencePlayer = new(executor);
+        DefaultNodeCommandFactory nodeFactory = new DefaultNodeCommandFactory();
+        executor.Initialize(sequencePlayer, nodeFactory);
+        
+        // Compose output ports
         DialogueNodeOutputComposite output = new ((IDialoguePresenter)presenterBehaviour, (INodeExecutor)commandExecuter);
 
-        DialogueSession session  = new (resolver, gatePlanner, gateRunner, vmBuilder, output, routeCatalog);
+        
+        DialogueSession session  = new (resolver, gatePlanner, gateRunner, vmBuilder, output, routeCatalog, service);
 
         _session = session;
         _gateRunner = gateRunner;

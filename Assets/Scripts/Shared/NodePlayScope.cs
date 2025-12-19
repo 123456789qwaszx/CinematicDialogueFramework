@@ -3,7 +3,7 @@ using System.Threading;
 public class NodePlayScope
 {
     public IPresentationPort Presenter { get; }
-    private DialogueContext Playback { get; }
+    public DialogueContext Playback { get; }
     public CancellationToken Token { get; set; }
     
     public NodePlayScope(IPresentationPort port, DialogueContext state)

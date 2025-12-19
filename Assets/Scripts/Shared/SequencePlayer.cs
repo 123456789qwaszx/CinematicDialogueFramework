@@ -3,25 +3,14 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Single, canonical command runner:
-/// - sequential execution
-/// - exception-safe per command (log & continue)
-/// - cancellation-aware
-/// - supports non-blocking commands via background coroutines (requires host)
-/// </summary>
 public sealed class SequencePlayer
 {
     private readonly MonoBehaviour _host;
     private readonly List<Coroutine> _bg = new();
     private bool _isStopping;
 
-    public SequencePlayer(MonoBehaviour host)
-    {
-        _host = host;
-    }
+    public SequencePlayer(MonoBehaviour host) => _host = host;
 
-    /// <summary>Stops all background routines started by non-blocking commands.</summary>
     public void Stop()
     {
         if (_host == null) { _bg.Clear(); return; }
@@ -46,19 +35,16 @@ public sealed class SequencePlayer
         }
     }
 
-    /// <summary>
-    /// Plays commands sequentially.
-    /// isValid: optional guard (e.g., runId check) to stop stale routines safely.
-    /// </summary>
     public IEnumerator PlayCommands(
         IReadOnlyList<ISequenceCommand> commands,
         NodePlayScope ctx,
         Func<bool> isValid = null,
-        bool log = false)
+        Action<string> trace = null)
     {
         if (commands == null || ctx == null) yield break;
 
         bool Valid() => isValid == null || isValid();
+        void Trace(string s) => trace?.Invoke(s);
 
         for (int i = 0; i < commands.Count; i++)
         {
@@ -71,13 +57,14 @@ public sealed class SequencePlayer
             IEnumerator routine = null;
             try
             {
-                if (log) Debug.Log($"[SequencePlayer] Execute: {GetDebugName(cmd)} (wait={cmd.WaitForCompletion})");
+                Trace($"Execute: {GetDebugName(cmd)} (wait={cmd.WaitForCompletion})");
                 routine = cmd.Execute(ctx);
             }
             catch (Exception e)
             {
+                Trace($"Exception in Execute(): {GetDebugName(cmd)}");
                 Debug.LogException(e);
-                continue; // one command fails -> continue next
+                continue;
             }
 
             if (routine == null) continue;
@@ -89,7 +76,6 @@ public sealed class SequencePlayer
             }
             else
             {
-                // fire-and-forget but MUST execute
                 if (_host != null)
                 {
                     Coroutine c = null;
@@ -97,18 +83,20 @@ public sealed class SequencePlayer
                     {
                         if (_isStopping) return;
                         _bg.Remove(c);
+                        Trace($"BG finished: {GetDebugName(cmd)}");
                     }));
                     _bg.Add(c);
+
+                    Trace($"BG start: {GetDebugName(cmd)}");
                 }
                 else
                 {
-                    // no coroutine host: at least try one MoveNext to trigger side-effects
                     bool yielded = false;
                     try { yielded = routine.MoveNext(); }
                     catch (Exception e) { Debug.LogException(e); }
 
                     if (yielded)
-                        Debug.LogWarning("[SequencePlayer] Non-blocking command yielded but there is no coroutine host.");
+                        Trace("Non-blocking command yielded but there is no coroutine host.");
                 }
             }
         }

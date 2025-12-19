@@ -1,3 +1,4 @@
+using UnityEditor;
 using UnityEngine;
 
 public sealed class DialogueSession
@@ -11,6 +12,10 @@ public sealed class DialogueSession
 
     private SituationSpec _situation;
     private DialogueRuntimeState _state;
+    
+    //---AddCustomCommand---
+    private CommandService _commandService;
+    private NodePlayScope _nodeScope;
 
     public DialogueContext Context { get; } = new DialogueContext
     {
@@ -26,7 +31,8 @@ public sealed class DialogueSession
         DialogueGateRunner gateRunner,
         NodeViewModelBuilder vmBuilder,
         IDialogueNodeOutput output,
-        DialogueRouteCatalogSO routeCatalog
+        DialogueRouteCatalogSO routeCatalog,
+        CommandService commandService
     )
     {
         _resolver = resolver;
@@ -35,6 +41,7 @@ public sealed class DialogueSession
         _vmBuilder = vmBuilder;
         _output = output;
         _routeCatalog = routeCatalog;
+        _commandService = commandService;
     }
 
     private const string FallbackRouteKey = "Default";
@@ -63,6 +70,9 @@ public sealed class DialogueSession
     {
         _state = CreateInitialState(routeKey);
         _situation = _resolver.Resolve(routeKey);
+        
+        if (_nodeScope == null || !ReferenceEquals(_nodeScope.Playback, Context))
+            _nodeScope = new NodePlayScope(_commandService, Context);
 
         _gatePlanner.BuildCurrentNodeGate(_situation, ref _state);
         EnterNode();
@@ -108,6 +118,7 @@ public sealed class DialogueSession
         _output.Show(viewModel);
 
         DialogueNodeSpec node = _situation.nodes[_state.NodeCursor];
-        _output.Play(node, Context);
+        
+        _output.Play(node, _nodeScope);
     }
 }

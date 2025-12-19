@@ -2,8 +2,8 @@ using UnityEngine;
 
 public interface IDialogueNodeOutput
 {
-    void Show(NodeViewModel vm);         // 표시(스냅샷)
-    void Play(DialogueNodeSpec node, DialogueContext ctx, DialogueLine fallbackLine = null); // 연출 실행(선택)
+    void Show(NodeViewModel vm);
+    void Play(DialogueNodeSpec node, NodePlayScope scope, DialogueLine fallbackLine = null);
     void Clear();
     void ShowSystemMessage(string msg);
 }
@@ -21,14 +21,12 @@ public sealed class DialogueNodeOutputComposite : IDialogueNodeOutput
 
     public void Show(NodeViewModel vm)
     {
-        Debug.Log($"{_presenter}");
         _presenter?.Present(vm);
     }
 
-    public void Play(DialogueNodeSpec node, DialogueContext ctx, DialogueLine fallbackLine = null)
+    public void Play(DialogueNodeSpec node, NodePlayScope scope, DialogueLine fallbackLine = null)
     {
-        Debug.Log($"{_executor}");
-        _executor?.Play(node, ctx, fallbackLine);
+        _executor?.Play(node, scope, fallbackLine);
     }
 
     public void Clear() => _presenter?.Clear();
