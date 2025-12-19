@@ -124,8 +124,10 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
             yield return _player.PlayCommands(
                 commands,
                 scope,
+                runId: runId,
                 isValid: () => runId == _runId && !_isStopping,
-                trace: Trace);
+                trace: Trace
+            );
         }
         finally
         {
