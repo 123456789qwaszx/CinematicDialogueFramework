@@ -4,165 +4,147 @@ using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
 
-/// <summary>
-/// Executes node-level cinematic commands (Command pipeline) for the dialogue system.
-/// - Builds runtime commands from DialogueNodeSpec (authoring specs)
-/// - Runs them sequentially using coroutine
-/// - Controls DialogueContext.IsNodeBusy (gate progression must wait while busy)
-/// - Supports Stop() via cancellation + coroutine stop
-/// </summary>
 public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
 {
+    [Header("Config")]
     [SerializeField] private CommandServiceConfig commandServiceConfig;
+
+    [Header("Debug")]
+    [SerializeField] private bool logCommands = false;
 
     private CommandService _services;
     private CommandContext _commandContext;
+    private SequencePlayer _player;
 
     private CancellationTokenSource _cts;
-    private Coroutine _currentRoutine;
+    private Coroutine _mainRoutine;
 
+    private INodeCommandFactory _commandFactory;
+
+    private int _runId = 0;
+    private bool _isStopping = false;
+    [SerializeField] private bool logNodeBoundary = false;
     private void Awake()
     {
+
         _services = new CommandService(commandServiceConfig);
+        _player = new SequencePlayer(this);
+        _commandFactory = new DefaultNodeCommandFactory();
     }
 
-    private void OnDestroy()
-    {
-        Stop();
-    }
+    private void OnDisable() => Stop();
+    private void OnDestroy() => Stop();
 
-    /// <summary>
-    /// Keeps CommandContext in sync with the DialogueSession-owned DialogueContext.
-    /// </summary>
-    public void SyncFrom(DialogueContext ctx)
-    {
-        if (ctx == null) return;
-
-        if (_commandContext == null)
-        {
-            _commandContext = new CommandContext(_services, ctx) { Token = CancellationToken.None };
-            if (ctx.TimeScale <= 0f) ctx.TimeScale = 1f;
-            return;
-        }
-
-        if (!ReferenceEquals(_commandContext.DialogueContext, ctx))
-        {
-            var prevToken = _commandContext.Token;
-            _commandContext = new CommandContext(_services, ctx) { Token = prevToken };
-            if (ctx.TimeScale <= 0f) ctx.TimeScale = 1f;
-        }
-    }
-
-    /// <summary>
-    /// Starts executing this node's commands.
-    /// If there are no commands, optionally runs a fallback ShowLine command.
-    /// </summary>
     public void Play(DialogueNodeSpec node, DialogueContext ctx, DialogueLine fallbackLine = null)
     {
-        if (node == null) return;
+        if (node == null || ctx == null) return;
 
-        SyncFrom(ctx);
-        if (_commandContext == null) return;
+        Stop();          // 완전 정지(이전 run 잔여 제거)
+        _runId++;         // 새로운 run 시작
 
-        Stop();
+        if (_commandContext == null || !ReferenceEquals(_commandContext.DialogueContext, ctx))
+            _commandContext = new CommandContext(_services, ctx);
 
-        List<ISequenceCommand> commands = BuildCommandsFrom(node);
+        var commands = BuildCommandsFrom(node);
+        if (logCommands)
+        {
+            Debug.Log($"[CommandExecutor] Node Play: commands={commands.Count}", this);
+        }
+        if ((commands == null || commands.Count == 0) && fallbackLine != null)
+            commands = new List<ISequenceCommand> { new ShowLineCommand(fallbackLine) };
 
-        if (commands.Count == 0 && fallbackLine != null)
-            commands.Add(new ShowLineCommand(fallbackLine));
-
-        if (commands.Count == 0)
+        if (commands == null || commands.Count == 0)
             return;
 
         ResetToken();
         _commandContext.Token = _cts.Token;
 
-        _currentRoutine = StartCoroutine(RunNodeCommands(commands));
+        int capturedRunId = _runId;
+        _mainRoutine = StartCoroutine(RunNode(commands, _commandContext, capturedRunId));
     }
 
     public void Stop()
     {
-        if (_currentRoutine != null)
+        if (_isStopping) return;
+        _isStopping = true;
+
+        try
         {
-            StopCoroutine(_currentRoutine);
-            _currentRoutine = null;
+            _runId++; // invalidate stale routines
+
+            CancelTokenOnly();
+
+            if (_mainRoutine != null)
+            {
+                StopCoroutine(_mainRoutine);
+                _mainRoutine = null;
+            }
+
+            _player?.Stop();
+
+            if (_commandContext != null)
+            {
+                _commandContext.IsNodeBusy = false;
+                _commandContext.Token = CancellationToken.None;
+            }
+
+            DisposeToken();
         }
-
-        DisposeToken();
-
-        // Safety: never leave Busy ON after a forced stop.
-        if (_commandContext != null)
-            _commandContext.IsNodeBusy = false;
+        finally
+        {
+            _isStopping = false;
+        }
     }
 
-    private IEnumerator RunNodeCommands(List<ISequenceCommand> commands)
+    private IEnumerator RunNode(List<ISequenceCommand> commands, CommandContext ctx, int runId)
     {
-        var ctx = _commandContext;
-        if (ctx == null) yield break;
+        if (commands == null || ctx == null) yield break;
+        if (runId != _runId) yield break;
 
         ctx.IsNodeBusy = true;
 
-        // Minimal inlined "SequencePlayer"
-        for (int i = 0; i < commands.Count; i++)
+        if (logCommands)
+            Debug.Log($"[CommandExecutor] Node Begin (runId={runId})", this);
+
+        try
         {
-            if (ctx.Token.IsCancellationRequested)
-                break;
-
-            ISequenceCommand cmd = commands[i];
-            if (cmd == null) continue;
-
-            IEnumerator routine = null;
-            try
+            yield return _player.PlayCommands(
+                commands,
+                ctx,
+                isValid: () => runId == _runId && !_isStopping,
+                log: logCommands);
+        }
+        finally
+        {
+            if (runId == _runId && ctx != null)
             {
-                routine = cmd.Execute(ctx);
-            }
-            catch (Exception e)
-            {
-                Debug.LogException(e);
-                // 정책: 커맨드 하나가 터져도 다음으로 진행할지/중단할지는 취향
-                // 여기서는 "계속 진행"으로 둠.
-            }
+                ctx.IsNodeBusy = false;
+                ctx.Token = System.Threading.CancellationToken.None;
+                _mainRoutine = null;
 
-            if (cmd.WaitForCompletion && routine != null)
-            {
-                while (!ctx.Token.IsCancellationRequested && routine.MoveNext())
-                    yield return routine.Current;
+                if (logCommands)
+                    Debug.Log($"[CommandExecutor] Node End (runId={runId})", this);
+
+                DisposeToken();
             }
         }
-
-        ctx.IsNodeBusy = false;
     }
 
-    private static List<ISequenceCommand> BuildCommandsFrom(DialogueNodeSpec node)
+    private List<ISequenceCommand> BuildCommandsFrom(DialogueNodeSpec node)
     {
         var list = new List<ISequenceCommand>();
+        if (node == null || node.commands == null) return list;
 
-        List<NodeCommandSpec> specs = node.commands;
-        if (specs == null || specs.Count == 0)
-            return list;
+        _commandFactory ??= new DefaultNodeCommandFactory();
 
-        for (int i = 0; i < specs.Count; i++)
+        foreach (var spec in node.commands)
         {
-            NodeCommandSpec spec = specs[i];
             if (spec == null) continue;
 
-            switch (spec.kind)
-            {
-                case NodeCommandKind.ShowLine:
-                    if (spec.line != null)
-                        list.Add(new ShowLineCommand(spec.line));
-                    break;
-
-                case NodeCommandKind.ShakeCamera:
-                    list.Add(new ShakeCameraCommand
-                    {
-                        strength = spec.shakeStrength,
-                        duration = spec.shakeDuration
-                    });
-                    break;
-
-                // TODO: 확장 커맨드들 매핑 (BGM/SE/CutIn/Portrait/Transition...)
-            }
+            if (_commandFactory.TryCreate(spec, out var cmd) && cmd != null)
+                list.Add(cmd);
+            else if (logCommands)
+                Debug.LogWarning($"[CommandExecutor] Unsupported command kind: {spec.kind}", this);
         }
 
         return list;
@@ -172,6 +154,18 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
     {
         DisposeToken();
         _cts = new CancellationTokenSource();
+    }
+
+    private void CancelTokenOnly()
+    {
+        if (_cts == null) return;
+
+        try
+        {
+            if (!_cts.IsCancellationRequested)
+                _cts.Cancel();
+        }
+        catch (ObjectDisposedException) { }
     }
 
     private void DisposeToken()

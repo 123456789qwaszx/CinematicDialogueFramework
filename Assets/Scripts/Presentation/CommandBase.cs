@@ -2,6 +2,19 @@ using System.Collections;
 using System.Threading;
 using UnityEngine;
 
+public enum SkipPolicy
+{
+    /// <summary>스킵 중이면 이 커맨드는 실행하지 않는다(기본).</summary>
+    Ignore = 0,
+
+    /// <summary>스킵 중이면 즉시 완료 처리(OnSkip 호출).</summary>
+    CompleteImmediately = 1,
+
+    /// <summary>스킵 중이어도 그대로 실행한다(예: 중요한 시스템 연출/상태 반영).</summary>
+    ExecuteEvenIfSkipping = 2
+}
+
+
 public interface ISequenceCommand
 {
     bool WaitForCompletion { get; }
@@ -110,67 +123,58 @@ public class CommandContext
 
 public abstract class CommandBase : ISequenceCommand
 {
-    /// <summary>이 커맨드가 끝날 때까지 큐가 기다릴지 여부</summary>
     public virtual bool WaitForCompletion => true;
-
-    /// <summary>디버그용 이름 (인스펙터/로그에서 사용)</summary>
     public virtual string DebugName => GetType().Name;
 
-    /// <summary>스킵 모드일 때도 이 커맨드를 꼭 실행해야 하는지</summary>
-    protected virtual bool ForceExecuteWhenSkipping => false;
+    // ✅ Ticket 07: 선언형 스킵 정책
+    public virtual SkipPolicy SkipPolicy => SkipPolicy.Ignore;
 
-    /// <summary>기본 실행 진입점 (템플릿 메서드 패턴)</summary>
     public IEnumerator Execute(CommandContext ctx)
     {
-        // 이미 취소됐으면 그냥 종료
-        if (ctx.Token.IsCancellationRequested)
-            yield break;
+        if (ctx == null) yield break;
+        if (ctx.Token.IsCancellationRequested) yield break;
 
-        // 스킵 모드인데, 스킵 가능 커맨드면 즉시 스킵 로직 태운 뒤 종료
-        if (ctx.IsSkipping && !ForceExecuteWhenSkipping)
+        // ✅ Ticket 07: 정책 기반 분기
+        if (ctx.IsSkipping)
         {
-            OnSkip(ctx);
+            switch (SkipPolicy)
+            {
+                case SkipPolicy.Ignore:
+                    yield break;
+
+                case SkipPolicy.CompleteImmediately:
+                    try { OnSkip(ctx); }
+                    catch (System.Exception e) { UnityEngine.Debug.LogException(e); }
+                    yield break;
+
+                case SkipPolicy.ExecuteEvenIfSkipping:
+                    // 그대로 실행 진행
+                    break;
+            }
+        }
+
+        IEnumerator inner = null;
+        try
+        {
+            inner = ExecuteInner(ctx);
+        }
+        catch (System.Exception e)
+        {
+            UnityEngine.Debug.LogException(e);
             yield break;
         }
 
-        // 실제 연출 로직
-        yield return ExecuteInner(ctx);
+        if (inner != null)
+            yield return inner;
     }
 
-    /// <summary>
-    /// 자식이 구현해야 하는 실제 연출 본체
-    /// (타이핑, 컷인, 카메라 등등)
-    /// </summary>
     protected abstract IEnumerator ExecuteInner(CommandContext ctx);
 
     /// <summary>
-    /// 스킵할 때의 동작 (예: 텍스트 즉시 완성, 페이드 바로 완료 등)
-    /// 기본은 아무것도 안 함
+    /// SkipPolicy == CompleteImmediately 일 때 호출됨.
     /// </summary>
-    protected virtual void OnSkip(CommandContext ctx)
-    {
-        // 필요하면 자식이 override
-    }
+    protected virtual void OnSkip(CommandContext ctx) { }
 
-    /// <summary>
-    /// 타임스케일 + 스킵/취소를 고려해서 기다리는 헬퍼
-    /// </summary>
-    protected IEnumerator Wait(CommandContext ctx, float seconds)
-    {
-        if (seconds <= 0f)
-            yield break;
-
-        float t = 0f;
-        while (t < seconds)
-        {
-            if (ctx.Token.IsCancellationRequested)
-                yield break;
-
-            if (ctx.IsSkipping) // 스킵이면 더 이상 기다릴 필요 없음
-                yield break;
-
-            t += Time.deltaTime * ctx.TimeScale;
-            yield return null;
-        }
-    }
+    // Wait()는 Ticket 03에서 unscaled로 이미 통일했다고 가정
 }
+
