@@ -2,25 +2,16 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-[Serializable]
-public class SituationSpec
-{
-    /// <summary>
-    /// Key used to locate this situation inside a DialogueSequenceData.
-    /// Must match (DialogueRoute).SituationKey.
-    /// </summary>
-    public string situationKey;
-    public List<DialogueNodeSpec> nodes = new();
-}
-
 [CreateAssetMenu(fileName = "DialogueSequenceData", menuName = "Dialogue/Sequence")]
 public class DialogueSequenceData : ScriptableObject
 {
     public string sequenceId;
-    public List<SituationSpec> situations = new();
-    
-    private Dictionary<string, SituationSpec> _situationsDict;
-    
+
+    // ✅ 인라인 작성 대신, 작성된 SituationSpecSO를 참조
+    public List<SituationSpecSO> situations = new();
+
+    private Dictionary<string, SituationSpecSO> _situationsDict;
+
     private void OnEnable()
     {
         RebuildIndex();
@@ -35,16 +26,29 @@ public class DialogueSequenceData : ScriptableObject
 
     private void RebuildIndex()
     {
-        _situationsDict = new Dictionary<string, SituationSpec>(StringComparer.Ordinal);
+        _situationsDict = new Dictionary<string, SituationSpecSO>(StringComparer.Ordinal);
 
         for (int i = 0; i < situations.Count; i++)
         {
-            SituationSpec situation = situations[i];
-            _situationsDict[situation.situationKey] = situation;
+            SituationSpecSO situation = situations[i];
+            if (situation == null)
+                continue;
+            
+            if (string.IsNullOrWhiteSpace(situation.situationKey))
+                continue;
+            
+            string key = situation.situationKey;
+            bool isNewKey = _situationsDict.TryAdd(key, situation);
+            
+            if (!isNewKey)
+            {
+                Debug.LogWarning($"Duplicate situationKey '{key}' in sequence '{name}'. Last one wins.");
+                _situationsDict[key] = situation;
+            }
         }
     }
-    
-    public bool TryGetSituation(string situationKey, out SituationSpec situation)
+
+    public bool TryGetSituation(string situationKey, out SituationSpecSO situation)
     {
         situation = null;
 
@@ -57,7 +61,7 @@ public class DialogueSequenceData : ScriptableObject
         if (_situationsDict == null)
             RebuildIndex();
 
-        if (!_situationsDict.TryGetValue(situationKey, out situation))
+        if (!_situationsDict.TryGetValue(situationKey, out situation) || situation == null)
         {
             Debug.LogWarning($"situationKey not found: '{situationKey}'");
             return false;

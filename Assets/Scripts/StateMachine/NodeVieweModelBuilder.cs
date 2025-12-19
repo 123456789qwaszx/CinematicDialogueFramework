@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 public class NodeViewModelBuilder
 {
-    public NodeViewModel Build(SituationSpec situation, DialogueRuntimeState state)
+    public NodeViewModel Build(SituationSpecSO situation, DialogueRuntimeState state)
     {
         var node = situation.nodes[state.NodeCursor];
         var line = FindPrimaryLine(node.commands);

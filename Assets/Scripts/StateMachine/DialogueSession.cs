@@ -10,7 +10,7 @@ public sealed class DialogueSession
     private readonly IDialogueNodeOutput _output;
     private readonly DialogueRouteCatalogSO _routeCatalog;
 
-    private SituationSpec _situation;
+    private SituationSpecSO _situation;
     private DialogueRuntimeState _state;
     
     //---AddCustomCommand---

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 public class DialogueGatePlanner
 {
-    public void BuildCurrentNodeGate(SituationSpec situation, ref DialogueRuntimeState state)
+    public void BuildCurrentNodeGate(SituationSpecSO situation, ref DialogueRuntimeState state)
     {
         var gate = new GateCursor
         {
