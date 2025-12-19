@@ -38,18 +38,7 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
 
     private void OnDisable() => Stop();
     private void OnDestroy() => Stop();
-
-    /// <summary>
-    /// Compatibility: 기존 호출부가 아직 "노드 단위"로 Play를 부르는 경우를 위해 유지.
-    /// Step 구조로 바뀐 이후에는 보통 PlayStep(node, stepIndex, ...)를 쓰는 게 맞다.
-    /// </summary>
-    public void Play(DialogueNodeSpec node, NodePlayScope scope, DialogueLine fallbackLine = null)
-    {
-        // 기본 동작을 "Step 0 재생"으로 두면, 최소한 이전 흐름이 완전히 죽진 않음.
-        // (올바른 흐름은 호출부에서 현재 stepIndex를 넘겨 PlayStep을 호출하는 것)
-        PlayStep(node, stepIndex: 0, scope: scope, fallbackLine: fallbackLine);
-    }
-
+    
     /// <summary>
     /// ✅ Step 기반 재생: 현재 step의 commands만 실행한다.
     /// </summary>

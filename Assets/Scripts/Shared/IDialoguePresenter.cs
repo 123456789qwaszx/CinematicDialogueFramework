@@ -17,7 +17,7 @@ public interface IDialoguePresenter
 
 public interface INodeExecutor
 {
-    void Play(DialogueNodeSpec node, NodePlayScope scope, DialogueLine fallbackLine = null);
+    void PlayStep(DialogueNodeSpec node, int stepIndex, NodePlayScope scope, DialogueLine fallbackLine = null);
     void Stop();
 }
 

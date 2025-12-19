@@ -3,9 +3,9 @@ using UnityEngine;
 public interface IDialogueNodeOutput
 {
     void Show(NodeViewModel vm);
-    void Play(DialogueNodeSpec node, NodePlayScope scope, DialogueLine fallbackLine = null);
     void Clear();
     void ShowSystemMessage(string msg);
+    void PlayStep(DialogueNodeSpec node, int stepIndex, NodePlayScope scope, DialogueLine fallbackLine = null);
 }
 
 public sealed class DialogueNodeOutputComposite : IDialogueNodeOutput
@@ -24,11 +24,12 @@ public sealed class DialogueNodeOutputComposite : IDialogueNodeOutput
         _presenter?.Present(vm);
     }
 
-    public void Play(DialogueNodeSpec node, NodePlayScope scope, DialogueLine fallbackLine = null)
-    {
-        _executor?.Play(node, scope, fallbackLine);
-    }
 
     public void Clear() => _presenter?.Clear();
     public void ShowSystemMessage(string msg) => _presenter?.PresentSystemMessage(msg);
+    
+    public void PlayStep(DialogueNodeSpec node, int stepIndex, NodePlayScope scope, DialogueLine fallbackLine = null)
+    {
+        _executor?.PlayStep(node, stepIndex, scope, fallbackLine);
+    }
 }
