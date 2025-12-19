@@ -52,7 +52,7 @@ public sealed class SequencePlayer
     /// </summary>
     public IEnumerator PlayCommands(
         IReadOnlyList<ISequenceCommand> commands,
-        CommandContext ctx,
+        NodePlayScope ctx,
         Func<bool> isValid = null,
         bool log = false)
     {
@@ -116,7 +116,7 @@ public sealed class SequencePlayer
 
     private static IEnumerator RunToEndBackground(
         IEnumerator routine,
-        CommandContext ctx,
+        NodePlayScope ctx,
         Func<bool> isValid,
         Action onFinished)
     {

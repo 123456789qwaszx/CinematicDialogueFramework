@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using UnityEngine;
 
-public class CommandService
+public class CommandService : IPresentationPort
 {
     private readonly CommandServiceConfig _config;
     public CommandService(CommandServiceConfig config)
@@ -17,10 +17,10 @@ public class CommandService
         => _cameraShake?.Shake(strength, duration);
 
 
-    public IEnumerator ShowLine(DialogueLine line, CommandContext ctx)
+    public IEnumerator ShowLine(DialogueLine line)
     {
         return _dialogueView != null
-            ? _dialogueView.ShowLine(line, ctx)
+            ? _dialogueView.ShowLine(line)
             : null;
     }
 

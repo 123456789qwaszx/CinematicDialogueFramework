@@ -13,7 +13,7 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
     [SerializeField] private bool logCommands = false;
 
     private CommandService _services;
-    private CommandContext _commandContext;
+    private NodePlayScope _api;     // ✅ 명확히 api로
     private SequencePlayer _player;
 
     private CancellationTokenSource _cts;
@@ -23,11 +23,10 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
 
     private int _runId = 0;
     private bool _isStopping = false;
-    [SerializeField] private bool logNodeBoundary = false;
+
     private void Awake()
     {
-
-        _services = new CommandService(commandServiceConfig);
+        _services = new CommandService(commandServiceConfig); // (Ticket05 버전이면 logContext 전달)
         _player = new SequencePlayer(this);
         _commandFactory = new DefaultNodeCommandFactory();
     }
@@ -35,32 +34,29 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
     private void OnDisable() => Stop();
     private void OnDestroy() => Stop();
 
-    public void Play(DialogueNodeSpec node, DialogueContext ctx, DialogueLine fallbackLine = null)
+    public void Play(DialogueNodeSpec node, DialogueContext state, DialogueLine fallbackLine = null)
     {
-        if (node == null || ctx == null) return;
+        if (node == null || state == null) return;
 
-        Stop();          // 완전 정지(이전 run 잔여 제거)
-        _runId++;         // 새로운 run 시작
-
-        if (_commandContext == null || !ReferenceEquals(_commandContext.DialogueContext, ctx))
-            _commandContext = new CommandContext(_services, ctx);
+        Stop();
+        _runId++;
 
         var commands = BuildCommandsFrom(node);
-        if (logCommands)
-        {
-            Debug.Log($"[CommandExecutor] Node Play: commands={commands.Count}", this);
-        }
+
         if ((commands == null || commands.Count == 0) && fallbackLine != null)
             commands = new List<ISequenceCommand> { new ShowLineCommand(fallbackLine) };
 
         if (commands == null || commands.Count == 0)
             return;
 
+        if (logCommands)
+            Debug.Log($"[CommandExecutor] Node Play: commands={commands.Count}", this);
+
         ResetToken();
-        _commandContext.Token = _cts.Token;
+        _api.Token = _cts.Token;
 
         int capturedRunId = _runId;
-        _mainRoutine = StartCoroutine(RunNode(commands, _commandContext, capturedRunId));
+        _mainRoutine = StartCoroutine(RunNode(commands, _api, capturedRunId));
     }
 
     public void Stop()
@@ -82,10 +78,11 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
 
             _player?.Stop();
 
-            if (_commandContext != null)
+            if (_api != null)
             {
-                _commandContext.IsNodeBusy = false;
-                _commandContext.Token = CancellationToken.None;
+                // ✅ API답게: Busy 제어는 메서드로
+                _api.SetNodeBusy(false);
+                _api.Token = CancellationToken.None;
             }
 
             DisposeToken();
@@ -96,12 +93,12 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         }
     }
 
-    private IEnumerator RunNode(List<ISequenceCommand> commands, CommandContext ctx, int runId)
+    private IEnumerator RunNode(List<ISequenceCommand> commands, NodePlayScope api, int runId)
     {
-        if (commands == null || ctx == null) yield break;
+        if (commands == null || api == null) yield break;
         if (runId != _runId) yield break;
 
-        ctx.IsNodeBusy = true;
+        api.SetNodeBusy(true);
 
         if (logCommands)
             Debug.Log($"[CommandExecutor] Node Begin (runId={runId})", this);
@@ -110,16 +107,16 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         {
             yield return _player.PlayCommands(
                 commands,
-                ctx,
+                api,
                 isValid: () => runId == _runId && !_isStopping,
                 log: logCommands);
         }
         finally
         {
-            if (runId == _runId && ctx != null)
+            if (runId == _runId && api != null)
             {
-                ctx.IsNodeBusy = false;
-                ctx.Token = System.Threading.CancellationToken.None;
+                api.SetNodeBusy(false);
+                api.Token = CancellationToken.None;
                 _mainRoutine = null;
 
                 if (logCommands)
