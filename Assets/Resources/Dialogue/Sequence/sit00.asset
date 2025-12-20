@@ -1,0 +1,160 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77efca1a7ac39ca499c3be8e21666640, type: 3}
+  m_Name: sit00
+  m_EditorClassIdentifier: Dialogue.Shared::SituationSpecSO
+  situationKey: sit00
+  nodes:
+  - steps:
+    - commands:
+      - kind: 0
+        line:
+          speakerId: qwe
+          expression: 0
+          text: qwe0
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      - kind: 0
+        line:
+          speakerId: qwe
+          expression: 0
+          text: qwe0
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 
+    - commands:
+      - kind: 0
+        line:
+          speakerId: qwe
+          expression: 0
+          text: qwe1
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 
+    - commands:
+      - kind: 0
+        line:
+          speakerId: qwer
+          expression: 0
+          text: qwe2
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 
+  - steps:
+    - commands:
+      - kind: 0
+        line:
+          speakerId: Node2
+          expression: 0
+          text: NextNode1
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      - kind: 0
+        line:
+          speakerId: qwe
+          expression: 0
+          text: qwe0
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 
+    - commands:
+      - kind: 0
+        line:
+          speakerId: Node2
+          expression: 0
+          text: Step2
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 
+    - commands:
+      - kind: 0
+        line:
+          speakerId: Node2
+          expression: 0
+          text: step3
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 
+  - steps:
+    - commands:
+      - kind: 0
+        line:
+          speakerId: Node3
+          expression: 0
+          text: step1
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      - kind: 0
+        line:
+          speakerId: qwe
+          expression: 0
+          text: qwe0
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 
+    - commands:
+      - kind: 0
+        line:
+          speakerId: Node3
+          expression: 0
+          text: Step2
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 
+    - commands:
+      - kind: 0
+        line:
+          speakerId: Node3
+          expression: 0
+          text: step3
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 

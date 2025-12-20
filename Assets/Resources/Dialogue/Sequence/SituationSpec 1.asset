@@ -12,5 +12,77 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77efca1a7ac39ca499c3be8e21666640, type: 3}
   m_Name: SituationSpec 1
   m_EditorClassIdentifier: Dialogue.Shared::SituationSpecSO
-  situationKey: 
-  nodes: []
+  situationKey: sit01
+  nodes:
+  - steps:
+    - commands:
+      - kind: 0
+        line:
+          speakerId: System
+          expression: 0
+          text: (write dialogue...)
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      - kind: 0
+        line:
+          speakerId: System
+          expression: 0
+          text: (write dialogue...)
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gate:
+        type: 0
+        seconds: 0
+        signalKey: 
+  - steps:
+    - commands:
+      - kind: 1
+        line:
+          speakerId: System
+          expression: 0
+          text: (write dialogue...)
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      - kind: 0
+        line:
+          speakerId: System
+          expression: 0
+          text: (write dialogue...)
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gate:
+        type: 0
+        seconds: 0
+        signalKey: 
+  - steps:
+    - commands:
+      - kind: 0
+        line:
+          speakerId: System
+          expression: 0
+          text: (write dialogue...)
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gate:
+        type: 0
+        seconds: 0
+        signalKey: 
+  - steps:
+    - commands:
+      - kind: 0
+        line:
+          speakerId: System
+          expression: 0
+          text: (write dialogue...)
+          position: 0
+        shakeStrength: 0
+        shakeDuration: 0
+      gate:
+        type: 0
+        seconds: 0
+        signalKey: 
