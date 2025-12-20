@@ -11,21 +11,18 @@ public sealed class DialogueSession
     private readonly NodeViewModelBuilder _vmBuilder;
     private readonly IDialogueNodeOutput _output;
     private readonly DialogueRouteCatalogSO _routeCatalog;
+    
     private readonly CommandService _commandService;
     
+    public DialogueContext Context { get; }
+    private readonly NodePlayScope _nodeScope;
+
     // Runtime state
     private SituationSpecSO _situation;
     private DialogueRuntimeState _state;
-    private NodePlayScope _nodeScope;
+    
     
     // Public surface
-    public DialogueContext Context { get; } = new DialogueContext
-    {
-        IsAutoMode = false,
-        IsSkipping = false,
-        TimeScale = 1f,
-        AutoAdvanceDelay = 0.6f
-    };
     
     // Ctor
     public DialogueSession(
@@ -35,7 +32,8 @@ public sealed class DialogueSession
         NodeViewModelBuilder vmBuilder,
         IDialogueNodeOutput output,
         DialogueRouteCatalogSO routeCatalog,
-        CommandService commandService
+        CommandService commandService,
+        DialoguePlaybackModes modes
     )
     {
         _resolver = resolver;
@@ -45,14 +43,16 @@ public sealed class DialogueSession
         _output = output;
         _routeCatalog = routeCatalog;
         _commandService = commandService;
+        Context = new DialogueContext { Modes = modes };
+        _nodeScope = new NodePlayScope(commandService, Context);
     }
     
     
+    //_nodeScope ??= new NodePlayScope(_commandService, Context);
     #region Public API
 
     public void StartDialogue(string routeKey)
     {
-        _nodeScope ??= new NodePlayScope(_commandService, Context);
         
         _state = CreateInitialState(routeKey);
         if (_state == null)

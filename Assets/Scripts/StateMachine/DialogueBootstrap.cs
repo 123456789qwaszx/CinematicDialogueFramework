@@ -37,12 +37,13 @@ public sealed class DialogueBootstrap : MonoBehaviour
         SequencePlayer sequencePlayer = new(executor);
         DefaultNodeCommandFactory nodeFactory = new DefaultNodeCommandFactory();
         executor.Initialize(sequencePlayer, nodeFactory);
+        DialoguePlaybackModes playbackModes = new ();
         
         // Compose output ports
         DialogueNodeOutputComposite output = new ((IDialoguePresenter)presenterBehaviour, (INodeExecutor)commandExecuter);
 
         
-        DialogueSession session  = new (resolver, gatePlanner, gateRunner, vmBuilder, output, routeCatalog, service);
+        DialogueSession session  = new (resolver, gatePlanner, gateRunner, vmBuilder, output, routeCatalog, service, playbackModes);
 
         _session = session;
         _gateRunner = gateRunner;
@@ -61,13 +62,13 @@ public sealed class DialogueBootstrap : MonoBehaviour
         {
             if (Input.GetKeyDown(KeyCode.A))
             {
-                _session.Context.IsAutoMode = !_session.Context.IsAutoMode;
+                _session.Context.Modes.IsAutoMode = !_session.Context.IsAutoMode;
                 Debug.Log($"[Dialogue] AutoMode = {_session.Context.IsAutoMode}");
             }
-
+        
             if (Input.GetKeyDown(KeyCode.K))
             {
-                _session.Context.IsSkipping = !_session.Context.IsSkipping;
+                _session.Context.Modes.IsSkipping = !_session.Context.IsSkipping;
                 Debug.Log($"[Dialogue] IsSkipping = {_session.Context.IsSkipping}");
             }
         }

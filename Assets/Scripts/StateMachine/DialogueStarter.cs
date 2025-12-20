@@ -25,27 +25,27 @@ public class DialogueStarter
     
     public bool ToggleSkip()
     {
-        _session.Context.IsSkipping = !_session.Context.IsSkipping;
+        _session.Context.Modes.IsSkipping = !_session.Context.Modes.IsSkipping;
         Debug.Log($"[DialogueStarter] IsSkipping={_session.Context.IsSkipping}");
         return _session.Context.IsSkipping;
     }
     
     public bool ToggleAutoMode()
     {
-        _session.Context.IsAutoMode = !_session.Context.IsAutoMode;
+        _session.Context.Modes.IsAutoMode = !_session.Context.Modes.IsAutoMode;
         Debug.Log($"[DialogueStarter] IsAutoMode={_session.Context.IsAutoMode}");
         return _session.Context.IsAutoMode;
     }
     
     public void SetAutoDelay(float seconds)
     {
-        _session.Context.AutoAdvanceDelay = Mathf.Max(0f, seconds);
+        _session.Context.Modes.AutoAdvanceDelay = Mathf.Max(0f, seconds);
         Debug.Log($"[DialogueStarter] AutoAdvanceDelay={_session.Context.AutoAdvanceDelay:0.00}s");
     }
     
     public void SetTimeScale(float scale)
     {
-        _session.Context.TimeScale = Mathf.Max(0.01f, scale);
+        _session.Context.Modes.TimeScale = Mathf.Max(0.01f, scale);
         Debug.Log($"[DialogueStarter] TimeScale={_session.Context.TimeScale:0.00}");
     }
     

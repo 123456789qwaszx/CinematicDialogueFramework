@@ -1,25 +1,57 @@
 using System;
+using UnityEngine;
 
-/// <summary>
-/// Auto/Skip are not gate tokens but global execution modes, so they live in a Context.
-/// This state is propagated across multiple systems (Runner/Typing/WaitInput, etc.).
-/// </summary>
+[Serializable]
+public sealed class DialoguePlaybackModes
+{
+    public bool IsAutoMode;
+    public bool IsSkipping;
+    public float TimeScale = 1f;
+    public float AutoAdvanceDelay = 0.6f;
+
+    public void ResetDefaults()
+    {
+        IsAutoMode = false;
+        IsSkipping = false;
+        TimeScale = 1f;
+        AutoAdvanceDelay = 0.6f;
+    }
+}
+
 [Serializable]
 public sealed class DialogueContext
 {
-    // 자동 진행 모드 여부 (ON이면 Input 게이트도 일정 딜레이 후 자동 통과)
-    public bool IsAutoMode = false;
+    [Tooltip("Shared playback modes (Auto/Skip/TimeScale/Delay). Must be assigned.")]
+    public DialoguePlaybackModes Modes;
 
-    // 스킵 모드 여부 (ON이면 가능한 모든 대기/연출을 즉시 통과하려고 시도)
-    public bool IsSkipping = false;
+    // -------- per-session runtime flags --------
+    public bool IsNodeBusy;    // 커맨드/타이핑 등 연출이 재생 중인지 (세션 로컬)
+    public bool IsClosed;      // ESC/Toast 닫기 등으로 이 세션만 닫혔는지
+    public bool BlockInput;    // 필요시 이 세션 입력만 막기(모달 등)
 
-    // 연출용 타임스케일 (0 이하로 가면 최소값으로 보정)
-    public float TimeScale = 1f;
+    // -------- convenience read-only views (shared) --------
+    public bool IsAutoMode => Modes != null && Modes.IsAutoMode;
+    public bool IsSkipping => Modes != null && Modes.IsSkipping;
 
-    // AutoMode일 때 Input 토큰 자동 진행 딜레이
-    public float AutoAdvanceDelay = 0.6f;
+    public float TimeScale
+    {
+        get
+        {
+            if (Modes == null) return 1f;
+            return Modes.TimeScale <= 0f ? 0.01f : Modes.TimeScale;
+        }
+    }
 
-    // 현재 노드의 연출(Command 파이프라인)이 아직 진행 중인지
-    // - true이면 GateRunner는 어떤 GateToken도 소비하지 않는다 (Skip 모드 제외)
-    public bool IsNodeBusy;
+    public float AutoAdvanceDelay => Modes != null ? Modes.AutoAdvanceDelay : 0.6f;
+
+    /// <summary>
+    /// 호출 정책 예시:
+    /// - StartDialogue 때: 세션 로컬 플래그만 리셋(모드는 유지)
+    /// </summary>
+    public void ResetSessionFlagsForStart()
+    {
+        IsNodeBusy = false;
+        IsClosed = false;
+        BlockInput = false;
+    }
 }
