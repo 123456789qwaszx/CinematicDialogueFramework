@@ -8,10 +8,10 @@ using System;
 public sealed class DialogueContext
 {
     // 자동 진행 모드 여부 (ON이면 Input 게이트도 일정 딜레이 후 자동 통과)
-    public bool IsAutoMode;
+    public bool IsAutoMode = false;
 
     // 스킵 모드 여부 (ON이면 가능한 모든 대기/연출을 즉시 통과하려고 시도)
-    public bool IsSkipping;
+    public bool IsSkipping = false;
 
     // 연출용 타임스케일 (0 이하로 가면 최소값으로 보정)
     public float TimeScale = 1f;

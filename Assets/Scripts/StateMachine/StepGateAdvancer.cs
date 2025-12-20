@@ -42,7 +42,7 @@ public class StepGateAdvancer : IDisposable
     /// </summary>
     public bool TryConsume(DialogueRuntimeState state, DialogueContext ctx)
     {
-        if (state.Gate.StepGates == null || state.Gate.StepIndex >= state.Gate.StepGates.Count)
+        if (state.StepGate.Tokens == null || state.StepGate.StepIndex >= state.StepGate.Tokens.Count)
             return false;
 
         // ✅ 0) 노드 연출이 아직 재생 중이면, 어떤 토큰도 소비하지 않는다 (Skip 모드 제외)
@@ -52,13 +52,13 @@ public class StepGateAdvancer : IDisposable
         // Skip: consume all remaining tokens immediately
         if (ctx != null && ctx.IsSkipping)
         {
-            state.Gate.StepIndex = state.Gate.StepGates.Count;
-            state.Gate.InFlight = default;
+            state.StepGate.StepIndex = state.StepGate.Tokens.Count;
+            state.StepGate.InFlight = default;
             _latchedSignals.Clear();
             return true;
         }
 
-        var tokenOpt = state.Gate.CurrentToken;
+        var tokenOpt = state.StepGate.CurrentToken;
         if (tokenOpt == null) return false;
 
         var token = tokenOpt.Value;
@@ -103,15 +103,15 @@ public class StepGateAdvancer : IDisposable
     {
         float delay = ctx.AutoAdvanceDelay <= 0f ? 0.4f : ctx.AutoAdvanceDelay;
 
-        if (state.Gate.InFlight.RemainingSeconds <= 0f)
-            state.Gate.InFlight.RemainingSeconds = delay;
+        if (state.StepGate.InFlight.RemainingSeconds <= 0f)
+            state.StepGate.InFlight.RemainingSeconds = delay;
 
         float dt = _time.UnscaledDeltaTime * (ctx.TimeScale <= 0f ? 0.01f : ctx.TimeScale);
-        state.Gate.InFlight.RemainingSeconds -= dt;
+        state.StepGate.InFlight.RemainingSeconds -= dt;
 
-        if (state.Gate.InFlight.RemainingSeconds <= 0f)
+        if (state.StepGate.InFlight.RemainingSeconds <= 0f)
         {
-            state.Gate.InFlight.RemainingSeconds = 0f;
+            state.StepGate.InFlight.RemainingSeconds = 0f;
             ConsumeCurrent(state);
             return true;
         }
@@ -127,15 +127,15 @@ public class StepGateAdvancer : IDisposable
             return true;
         }
 
-        if (state.Gate.InFlight.RemainingSeconds <= 0f)
-            state.Gate.InFlight.RemainingSeconds = seconds;
+        if (state.StepGate.InFlight.RemainingSeconds <= 0f)
+            state.StepGate.InFlight.RemainingSeconds = seconds;
 
         float dt = _time.UnscaledDeltaTime * (ctx != null && ctx.TimeScale > 0f ? ctx.TimeScale : 0.01f);
-        state.Gate.InFlight.RemainingSeconds -= dt;
+        state.StepGate.InFlight.RemainingSeconds -= dt;
 
-        if (state.Gate.InFlight.RemainingSeconds <= 0f)
+        if (state.StepGate.InFlight.RemainingSeconds <= 0f)
         {
-            state.Gate.InFlight.RemainingSeconds = 0f;
+            state.StepGate.InFlight.RemainingSeconds = 0f;
             ConsumeCurrent(state);
             return true;
         }
@@ -145,11 +145,11 @@ public class StepGateAdvancer : IDisposable
     
     private bool TickSignal(DialogueRuntimeState state, string expectedKey)
     {
-        state.Gate.InFlight.WaitingSignalKey = expectedKey;
+        state.StepGate.InFlight.WaitingSignalKey = expectedKey;
     
         if (!string.IsNullOrEmpty(expectedKey) && _latchedSignals.Remove(expectedKey))
         {
-            state.Gate.InFlight.WaitingSignalKey = null;
+            state.StepGate.InFlight.WaitingSignalKey = null;
             ConsumeCurrent(state);
             return true;
         }
@@ -165,7 +165,7 @@ public class StepGateAdvancer : IDisposable
 
     private static void ConsumeCurrent(DialogueRuntimeState state)
     {
-        state.Gate.StepIndex++;
-        state.Gate.InFlight = default;
+        state.StepGate.StepIndex++;
+        state.StepGate.InFlight = default;
     }
 }

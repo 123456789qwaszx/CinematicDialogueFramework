@@ -9,29 +9,29 @@ public class NodeViewModelBuilder
             return NodeViewModel.System("(none)", -1, "State is null.");
 
         if (situation == null || situation.nodes == null)
-            return NodeViewModel.System(state.SituationKey, state.NodeCursor, $"Missing SituationSpec: '{state.SituationKey}'");
+            return NodeViewModel.System(state.SituationKey, state.CurrentNodeIndex, $"Missing SituationSpec: '{state.SituationKey}'");
 
-        if (state.NodeCursor < 0 || state.NodeCursor >= situation.nodes.Count)
-            return NodeViewModel.System(state.SituationKey, state.NodeCursor, $"Invalid NodeCursor={state.NodeCursor}");
+        if (state.CurrentNodeIndex < 0 || state.CurrentNodeIndex >= situation.nodes.Count)
+            return NodeViewModel.System(state.SituationKey, state.CurrentNodeIndex, $"Invalid NodeCursor={state.CurrentNodeIndex}");
 
-        var node = situation.nodes[state.NodeCursor];
+        var node = situation.nodes[state.CurrentNodeIndex];
         if (node == null || node.steps == null || node.steps.Count == 0)
         {
             return new NodeViewModel(
                 state.SituationKey,
-                state.NodeCursor,
+                state.CurrentNodeIndex,
                 string.Empty,
                 string.Empty,
                 Expression.Default,
                 DialoguePosition.Left,
                 state.BranchKey,
                 state.VariantKey,
-                state.CurrentNodeTokenCount
+                state.StepGateTokenCount 
             );
         }
 
         // 핵심: "현재 step"에서 대표 라인 찾기
-        int stepIndex = state.Gate.StepIndex; // GateCursor.TokenCursor == 현재 step index 라는 전제
+        int stepIndex = state.StepGate.StepIndex; // GateCursor.TokenCursor == 현재 step index 라는 전제
         DialogueLine line = null;
 
         if (stepIndex >= 0 && stepIndex < node.steps.Count)
@@ -46,14 +46,14 @@ public class NodeViewModelBuilder
 
         return new NodeViewModel(
             state.SituationKey,
-            state.NodeCursor,
+            state.CurrentNodeIndex,
             line?.speakerId ?? string.Empty,
             line?.text ?? string.Empty,
             line?.expression ?? Expression.Default,
             line?.position ?? DialoguePosition.Left,
             state.BranchKey,
             state.VariantKey,
-            state.CurrentNodeTokenCount
+            state.StepGateTokenCount
         );
     }
 

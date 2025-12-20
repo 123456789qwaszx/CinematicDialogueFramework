@@ -7,32 +7,32 @@ public class StepGatePlanBuilder
     {
         var gate = new StepGateState
         {
-            StepGates      = new List<GateToken>(8),
+            Tokens      = new List<GateToken>(8),
             StepIndex = 0,
             InFlight    = default
         };
 
         if (state == null || situation == null || situation.nodes == null)
         {
-            gate.StepGates.Add(GateToken.Immediately());
-            if (state != null) state.Gate = gate;
+            gate.Tokens.Add(GateToken.Immediately());
+            if (state != null) state.StepGate = gate;
             return;
         }
 
         // End-of-situation: 최소 1 토큰 보장
-        if (state.NodeCursor >= situation.nodes.Count)
+        if (state.CurrentNodeIndex >= situation.nodes.Count)
         {
-            gate.StepGates.Add(GateToken.Immediately());
-            state.Gate = gate;
+            gate.Tokens.Add(GateToken.Immediately());
+            state.StepGate = gate;
             return;
         }
 
-        DialogueNodeSpec node = situation.nodes[state.NodeCursor];
+        DialogueNodeSpec node = situation.nodes[state.CurrentNodeIndex];
 
         if (node == null || node.steps == null || node.steps.Count == 0)
         {
-            gate.StepGates.Add(GateToken.Input());
-            state.Gate = gate;
+            gate.Tokens.Add(GateToken.Input());
+            state.StepGate = gate;
             return;
         }
 
@@ -45,12 +45,12 @@ public class StepGatePlanBuilder
             if (EqualityComparer<GateToken>.Default.Equals(token, default))
                 token = GateToken.Input();
 
-            gate.StepGates.Add(token);
+            gate.Tokens.Add(token);
         }
 
-        if (gate.StepGates.Count == 0)
-            gate.StepGates.Add(GateToken.Input());
+        if (gate.Tokens.Count == 0)
+            gate.Tokens.Add(GateToken.Input());
 
-        state.Gate = gate;
+        state.StepGate = gate;
     }
 }
