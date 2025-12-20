@@ -1,15 +1,13 @@
 using System;
 
 /// <summary>
-/// Pure logic that interprets GateTokens and decides "when we can advance".
-/// All rules for Auto / Skip / TimeScale / Delay / Signal are centralized here.
-///
-/// ✅ 중요한 원칙:
-/// - 진행을 막는 대기 조건은 오직 여기(GateRunner + GateToken)에만 존재한다.
-/// - View/Command 파이프라인은 오직 연출(타이핑/애니메이션)만 담당하고,
-///   "아직 연출 중인지"를 DialogueContext.IsNodeBusy로만 알려준다.
+/// Evaluates the current step gate token and advances the step cursor when it is satisfied.
+/// 
+/// Contract:
+/// - Returns true if it consumed at least one gate token (StepIndex advanced or Skip jumped to end).
+/// - Returns false if blocked / waiting (e.g., busy animation, missing input, remaining delay, signal not yet received).
 /// </summary>
-public class DialogueGateRunner : IDisposable
+public class StepGateAdvancer : IDisposable
 {
     private readonly IInputSource _input;
     private readonly ITimeSource _time;
@@ -18,7 +16,7 @@ public class DialogueGateRunner : IDisposable
     private string _lastSignalKey;
     //private readonly System.Collections.Generic.HashSet<string> _latchedSignals = new();
 
-    public DialogueGateRunner(IInputSource input, ITimeSource time, ISignalBus signals)
+    public StepGateAdvancer(IInputSource input, ITimeSource time, ISignalBus signals)
     {
         _input   = input;
         _time    = time;
@@ -44,13 +42,12 @@ public class DialogueGateRunner : IDisposable
     // }
 
     /// <summary>
-    /// Advances the current node's GateTokens as far as possible.
-    /// - true: at least one token was consumed
-    /// - false: cannot consume any more tokens (blocked / waiting)
+    /// Tries to consume the current step gate token.
+    /// Returns true if one token was consumed (StepIndex advanced), otherwise false.
     /// </summary>
-    public bool Tick(DialogueRuntimeState state, DialogueContext ctx)
+    public bool TryConsume(DialogueRuntimeState state, DialogueContext ctx)
     {
-        if (state.Gate.Tokens == null || state.Gate.TokenCursor >= state.Gate.Tokens.Count)
+        if (state.Gate.StepGates == null || state.Gate.StepIndex >= state.Gate.StepGates.Count)
             return false;
 
         // ✅ 0) 노드 연출이 아직 재생 중이면, 어떤 토큰도 소비하지 않는다 (Skip 모드 제외)
@@ -60,7 +57,7 @@ public class DialogueGateRunner : IDisposable
         // Skip: consume all remaining tokens immediately
         if (ctx != null && ctx.IsSkipping)
         {
-            state.Gate.TokenCursor = state.Gate.Tokens.Count;
+            state.Gate.StepIndex = state.Gate.StepGates.Count;
             state.Gate.InFlight = default;
             return true;
         }
@@ -181,7 +178,7 @@ public class DialogueGateRunner : IDisposable
 
     private static void ConsumeCurrent(DialogueRuntimeState state)
     {
-        state.Gate.TokenCursor++;
+        state.Gate.StepIndex++;
         state.Gate.InFlight = default;
     }
 }

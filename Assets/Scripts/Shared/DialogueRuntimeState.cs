@@ -19,10 +19,10 @@ public sealed class DialogueRuntimeState
     public int NodeCursor; // lineIndex / nodeIndex (required)
 
     // 3) Gate (token stream that blocks progression at the current node + progress cursor)
-    public GateCursor Gate;
+    public StepGateState Gate;
 
     // ---- Derived / Debug-friendly (does not have to be persisted) ----
-    public int CurrentNodeTokenCount => Gate.Tokens?.Count ?? 0;
-    public bool IsNodeGateCompleted => Gate.Tokens != null && Gate.TokenCursor >= Gate.Tokens.Count;
+    public int CurrentNodeTokenCount => Gate.StepGates?.Count ?? 0;
+    public bool IsNodeGateCompleted => Gate.StepGates != null && Gate.StepIndex >= Gate.StepGates.Count;
     public bool IsAtEndOfSituation => false; // Optional: overall length/end can be managed by Resolver/Session
 }

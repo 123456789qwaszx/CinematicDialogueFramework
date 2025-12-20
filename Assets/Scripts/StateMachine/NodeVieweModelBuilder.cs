@@ -31,7 +31,7 @@ public class NodeViewModelBuilder
         }
 
         // 핵심: "현재 step"에서 대표 라인 찾기
-        int stepIndex = state.Gate.TokenCursor; // GateCursor.TokenCursor == 현재 step index 라는 전제
+        int stepIndex = state.Gate.StepIndex; // GateCursor.TokenCursor == 현재 step index 라는 전제
         DialogueLine line = null;
 
         if (stepIndex >= 0 && stepIndex < node.steps.Count)

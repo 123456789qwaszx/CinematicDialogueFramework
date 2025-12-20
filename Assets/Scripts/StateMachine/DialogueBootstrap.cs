@@ -13,7 +13,7 @@ public sealed class DialogueBootstrap : MonoBehaviour
     
     [Header("Session / Runner")]
     private DialogueSession _session;
-    private DialogueGateRunner _gateRunner;
+    private StepGateAdvancer _gateRunner;
     
     [Header("Starter")]
     private DialogueStarter _dialogueStarter;
@@ -23,13 +23,13 @@ public sealed class DialogueBootstrap : MonoBehaviour
     private void Awake()
     {
         DialogueResolver resolver       = new (routeCatalog);
-        DialogueGatePlanner gatePlanner = new ();
+        StepGatePlanBuilder gatePlanner = new ();
         NodeViewModelBuilder vmBuilder  = new ();
 
         // Compose runner (subscribes to signals)
         UnityInputSource input        = new();
         UnityTimeSource time          = new();
-        DialogueGateRunner gateRunner = new DialogueGateRunner(input, time, signals);
+        StepGateAdvancer gateRunner = new StepGateAdvancer(input, time, signals);
 
         // Optional extension ports
         CommandService service = new CommandService(commandServiceConfig);

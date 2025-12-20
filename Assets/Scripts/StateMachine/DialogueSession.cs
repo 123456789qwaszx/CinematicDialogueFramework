@@ -3,8 +3,8 @@ using UnityEngine;
 public sealed class DialogueSession
 {
     private readonly DialogueResolver _resolver;
-    private readonly DialogueGatePlanner _gatePlanner;
-    private readonly DialogueGateRunner _gateRunner;
+    private readonly StepGatePlanBuilder _gatePlanner;
+    private readonly StepGateAdvancer _gateRunner;
     private readonly NodeViewModelBuilder _vmBuilder;
     private readonly IDialogueNodeOutput _output;
     private readonly DialogueRouteCatalogSO _routeCatalog;
@@ -25,8 +25,8 @@ public sealed class DialogueSession
 
     public DialogueSession(
         DialogueResolver resolver,
-        DialogueGatePlanner gatePlanner,
-        DialogueGateRunner gateRunner,
+        StepGatePlanBuilder gatePlanner,
+        StepGateAdvancer gateRunner,
         NodeViewModelBuilder vmBuilder,
         IDialogueNodeOutput output,
         DialogueRouteCatalogSO routeCatalog,
@@ -85,7 +85,7 @@ public sealed class DialogueSession
             _nodeScope = new NodePlayScope(_commandService, Context);
 
         // 노드 게이트 계획(= steps.Count만큼 Tokens)
-        _gatePlanner.BuildCurrentNodeGate(_situation, ref _state);
+        _gatePlanner.BuildForCurrentNode(_situation, ref _state);
 
         // ✅ 노드 진입 시 step 0 실행
         EnterStep();
@@ -106,7 +106,7 @@ public sealed class DialogueSession
         // GateRunner 내부에서 Busy면 false를 반환하므로, 여기서 따로 Busy 체크 안 해도 됨.
         while (true)
         {
-            bool consumed = _gateRunner.Tick(_state, Context);
+            bool consumed = _gateRunner.TryConsume(_state, Context);
             if (!consumed)
                 break;
 
@@ -123,7 +123,7 @@ public sealed class DialogueSession
                     return;
                 }
 
-                _gatePlanner.BuildCurrentNodeGate(_situation, ref _state);
+                _gatePlanner.BuildForCurrentNode(_situation, ref _state);
 
                 // 다음 노드의 step 0 실행
                 EnterStep();
@@ -143,7 +143,7 @@ public sealed class DialogueSession
         if (_situation == null || _state == null) return;
         if (_state.NodeCursor < 0 || _state.NodeCursor >= _situation.nodes.Count) return;
 
-        Debug.Log($"[Gate] tokens={_state.Gate.Tokens?.Count ?? -1}, cursor={_state.Gate.TokenCursor}");
+        Debug.Log($"[Gate] tokens={_state.Gate.StepGates?.Count ?? -1}, cursor={_state.Gate.StepIndex}");
 
         // ✅ stepIndex 기반 VM
         NodeViewModel viewModel = _vmBuilder.Build(_situation, _state);
@@ -151,7 +151,7 @@ public sealed class DialogueSession
 
         DialogueNodeSpec node = _situation.nodes[_state.NodeCursor];
 
-        int stepIndex = _state.Gate.TokenCursor;
+        int stepIndex = _state.Gate.StepIndex;
 
         // ✅ 여기서 반드시 "현재 stepIndex"를 재생해야 Step1+가 이어진다
         _output.PlayStep(node, stepIndex, _nodeScope);

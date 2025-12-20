@@ -1,20 +1,20 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class DialogueGatePlanner
+public class StepGatePlanBuilder
 {
-    public void BuildCurrentNodeGate(SituationSpecSO situation, ref DialogueRuntimeState state)
+    public void BuildForCurrentNode(SituationSpecSO situation, ref DialogueRuntimeState state)
     {
-        var gate = new GateCursor
+        var gate = new StepGateState
         {
-            Tokens      = new List<GateToken>(8),
-            TokenCursor = 0,
+            StepGates      = new List<GateToken>(8),
+            StepIndex = 0,
             InFlight    = default
         };
 
         if (state == null || situation == null || situation.nodes == null)
         {
-            gate.Tokens.Add(GateToken.Immediately());
+            gate.StepGates.Add(GateToken.Immediately());
             if (state != null) state.Gate = gate;
             return;
         }
@@ -22,7 +22,7 @@ public class DialogueGatePlanner
         // End-of-situation: 최소 1 토큰 보장
         if (state.NodeCursor >= situation.nodes.Count)
         {
-            gate.Tokens.Add(GateToken.Immediately());
+            gate.StepGates.Add(GateToken.Immediately());
             state.Gate = gate;
             return;
         }
@@ -31,7 +31,7 @@ public class DialogueGatePlanner
 
         if (node == null || node.steps == null || node.steps.Count == 0)
         {
-            gate.Tokens.Add(GateToken.Input());
+            gate.StepGates.Add(GateToken.Input());
             state.Gate = gate;
             return;
         }
@@ -45,11 +45,11 @@ public class DialogueGatePlanner
             if (EqualityComparer<GateToken>.Default.Equals(token, default))
                 token = GateToken.Input();
 
-            gate.Tokens.Add(token);
+            gate.StepGates.Add(token);
         }
 
-        if (gate.Tokens.Count == 0)
-            gate.Tokens.Add(GateToken.Input());
+        if (gate.StepGates.Count == 0)
+            gate.StepGates.Add(GateToken.Input());
 
         state.Gate = gate;
     }
