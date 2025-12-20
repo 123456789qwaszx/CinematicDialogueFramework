@@ -13,8 +13,8 @@ public class StepGateAdvancer : IDisposable
     private readonly ITimeSource _time;
     private readonly ISignalBus _signals;
 
-    private string _lastSignalKey;
-    //private readonly System.Collections.Generic.HashSet<string> _latchedSignals = new();
+    // Signals are latched until consumed by a Signal gate token.
+    private readonly System.Collections.Generic.HashSet<string> _latchedSignals = new();
 
     public StepGateAdvancer(IInputSource input, ITimeSource time, ISignalBus signals)
     {
@@ -32,14 +32,9 @@ public class StepGateAdvancer : IDisposable
     
     private void OnSignal(string key)
     {
-        // Actual key matching is handled during Tick
-        _lastSignalKey = key;
+        if (!string.IsNullOrEmpty(key))
+            _latchedSignals.Add(key);
     }
-    // private void OnSignal(string key)
-    // {
-    //     if (!string.IsNullOrEmpty(key))
-    //         _latchedSignals.Add(key);
-    // }
 
     /// <summary>
     /// Tries to consume the current step gate token.
@@ -59,6 +54,7 @@ public class StepGateAdvancer : IDisposable
         {
             state.Gate.StepIndex = state.Gate.StepGates.Count;
             state.Gate.InFlight = default;
+            _latchedSignals.Clear();
             return true;
         }
 
@@ -146,35 +142,26 @@ public class StepGateAdvancer : IDisposable
 
         return false;
     }
-
-
+    
     private bool TickSignal(DialogueRuntimeState state, string expectedKey)
     {
         state.Gate.InFlight.WaitingSignalKey = expectedKey;
-
-        if (_lastSignalKey == expectedKey)
+    
+        if (!string.IsNullOrEmpty(expectedKey) && _latchedSignals.Remove(expectedKey))
         {
-            _lastSignalKey = null;
             state.Gate.InFlight.WaitingSignalKey = null;
             ConsumeCurrent(state);
             return true;
         }
-
+    
         return false;
     }
-    // private bool TickSignal(DialogueRuntimeState state, string expectedKey)
-    // {
-    //     state.Gate.InFlight.WaitingSignalKey = expectedKey;
-    //
-    //     if (!string.IsNullOrEmpty(expectedKey) && _latchedSignals.Remove(expectedKey))
-    //     {
-    //         state.Gate.InFlight.WaitingSignalKey = null;
-    //         ConsumeCurrent(state);
-    //         return true;
-    //     }
-    //
-    //     return false;
-    // }
+    
+    public void ClearLatchedSignals()
+    {
+        _latchedSignals.Clear();
+    }
+
 
     private static void ConsumeCurrent(DialogueRuntimeState state)
     {

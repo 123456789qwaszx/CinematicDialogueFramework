@@ -86,7 +86,7 @@ public sealed class DialogueSession
 
         // 노드 게이트 계획(= steps.Count만큼 Tokens)
         _gatePlanner.BuildForCurrentNode(_situation, ref _state);
-
+        _gateRunner.ClearLatchedSignals();
         // ✅ 노드 진입 시 step 0 실행
         EnterStep();
     }
@@ -96,6 +96,7 @@ public sealed class DialogueSession
         _situation = null;
         _state = null;
         _output.Clear();
+        _gateRunner.ClearLatchedSignals();
     }
 
     public void Tick()
@@ -118,11 +119,13 @@ public sealed class DialogueSession
 
                 if (_state.NodeCursor >= _situation.nodes.Count)
                 {
+                    _gateRunner.ClearLatchedSignals();
                     _output.ShowSystemMessage("(End of Situation)");
                     Stop();
                     return;
                 }
-
+                
+                _gateRunner.ClearLatchedSignals();
                 _gatePlanner.BuildForCurrentNode(_situation, ref _state);
 
                 // 다음 노드의 step 0 실행
