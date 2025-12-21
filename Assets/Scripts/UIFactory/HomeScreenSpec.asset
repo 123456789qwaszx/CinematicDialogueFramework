@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 90a2d5ea8eb896f47be4535298ae1233, type: 3}
+  m_Name: HomeScreenSpec
+  m_EditorClassIdentifier: Assembly-CSharp::UIScreenCatalog
+  entries:
+  - key: 0
+    spec:
+      screenId: Home
+      baseTheme: {fileID: 0}
+      baseLayout: {fileID: 0}
+      variants: []
+      name: Header
+      templatePrefab: {fileID: 4994278366068515335, guid: 1d549f43fe2a31d4ba732362e30b4093, type: 3}
+      slots:
+      - slotName: Header
+        widgets:
+        - widgetType: 0
+          text: HOME
+          onClickRoute: 
+      - slotName: Body
+        widgets:
+        - widgetType: 0
+          text: Welcome!
+          onClickRoute: 
+      - slotName: Footer
+        widgets:
+        - widgetType: 1
+          text: Go Shop
+          onClickRoute: shop
+  - key: 1
+    spec:
+      screenId: Shop
+      baseTheme: {fileID: 0}
+      baseLayout: {fileID: 0}
+      variants: []
+      name: SHOP
+      templatePrefab: {fileID: 4994278366068515335, guid: 1d549f43fe2a31d4ba732362e30b4093, type: 3}
+      slots:
+      - slotName: Header
+        widgets:
+        - widgetType: 0
+          text: SHOP
+          onClickRoute: 
+      - slotName: Body
+        widgets:
+        - widgetType: 0
+          text: But something...
+          onClickRoute: 
+      - slotName: Footer
+        widgets:
+        - widgetType: 1
+          text: Back Home
+          onClickRoute: home
