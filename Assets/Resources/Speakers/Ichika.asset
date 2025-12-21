@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dde4b5dcaeb0ed646914fe88306bbc64, type: 3}
+  m_Name: Ichika
+  m_EditorClassIdentifier: Dialogue.Shared::DialogueSpeakerData
+  speakerId: Ichika
+  displayName: Ichika
+  portraitConfigs:
+  - expression: 0
+    portrait: {fileID: 21300000, guid: 892091a80da32134f830988e424dde8b, type: 3}
+  - expression: 1
+    portrait: {fileID: 21300000, guid: f9a109c797134a84d9c18ca90fc29b72, type: 3}
+  - expression: 2
+    portrait: {fileID: 21300000, guid: 2bfb54ee92aa5b447b8484f614c54526, type: 3}
+  - expression: 3
+    portrait: {fileID: 21300000, guid: 61e3cc06be10add4098bac139b0f43b9, type: 3}
+  - expression: 4
+    portrait: {fileID: 21300000, guid: ffc65051fa54505429161e4539cc0d73, type: 3}

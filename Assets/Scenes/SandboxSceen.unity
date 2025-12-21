@@ -344,6 +344,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9c2792edb4e770e46b744342b684a8ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIDialoguePresenterTMP
+  root: {fileID: 279543598}
   speaker: {fileID: 1184554652}
   body: {fileID: 1629982602}
 --- !u!1 &330585543
@@ -671,7 +672,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DialogueTestDriver
   bootstrap: {fileID: 1644391588}
-  testRouteKey: Intro
+  testRouteKey: MeguAndKasumi
   delaySecond: 0.6
   timeScale: 1
 --- !u!4 &590301590
@@ -2588,7 +2589,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DialogueRepository
   showDebugInfo: 1
   sequenceResourcesPath: Dialogue/Sequence
-  speakerResourcesPath: Dialogue/Speaker
+  speakerResourcesPath: Speakers
 --- !u!4 &1642843086
 Transform:
   m_ObjectHideFlags: 0

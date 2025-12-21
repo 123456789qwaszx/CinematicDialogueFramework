@@ -3,8 +3,6 @@ using System.Threading;
 using UnityEngine;
 
 
-
-
 public abstract class CommandBase : ISequenceCommand
 {
     public virtual bool WaitForCompletion => true;

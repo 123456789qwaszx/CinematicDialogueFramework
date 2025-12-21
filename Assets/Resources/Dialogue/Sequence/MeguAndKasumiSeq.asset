@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e39f4c116589f104eb0d8510d5217462, type: 3}
+  m_Name: MeguAndKasumiSeq
+  m_EditorClassIdentifier: Dialogue.Shared::DialogueSequenceData
+  sequenceId: MeguAndKasumi
+  situations:
+  - {fileID: 11400000, guid: ae31df1c71a294740a0ac3f99310132d, type: 2}

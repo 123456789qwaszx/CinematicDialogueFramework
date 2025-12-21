@@ -16,3 +16,6 @@ MonoBehaviour:
   - routeKey: Intro
     sequenceData: {fileID: 11400000, guid: a852611cd4779c549aa3496115c119e5, type: 2}
     situationKey: sit00
+  - routeKey: MeguAndKasumi
+    sequenceData: {fileID: 11400000, guid: 652f1d1b50eb4474c8dd56a365931b60, type: 2}
+    situationKey: sit01

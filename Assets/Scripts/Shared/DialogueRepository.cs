@@ -15,7 +15,7 @@ public sealed class DialogueRepository : Singleton<DialogueRepository>
 
     [Header("Resources Path (Optional)")]
     [SerializeField] private string sequenceResourcesPath = "Dialogue/Sequence";
-    [SerializeField] private string speakerResourcesPath  = "Dialogue/Speaker";
+    [SerializeField] private string speakerResourcesPath  = "Speakers";
 
     // ===== Data lookup =====
     private readonly Dictionary<string, DialogueSequenceData> _sequencesById 

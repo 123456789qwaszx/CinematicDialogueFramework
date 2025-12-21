@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dde4b5dcaeb0ed646914fe88306bbc64, type: 3}
+  m_Name: Megu
+  m_EditorClassIdentifier: Dialogue.Shared::DialogueSpeakerData
+  speakerId: Megu
+  displayName: Megu
+  portraitConfigs:
+  - expression: 0
+    portrait: {fileID: 21300000, guid: 18ad64fc005867c43865db20422f506e, type: 3}
+  - expression: 1
+    portrait: {fileID: 21300000, guid: 75f9959559a45fc40a365e362006106b, type: 3}
+  - expression: 2
+    portrait: {fileID: 21300000, guid: 53f09bf583a053b44ba17775e16e4399, type: 3}
+  - expression: 3
+    portrait: {fileID: 21300000, guid: bd04f36d1f9660d44b0a460119314dc5, type: 3}
+  - expression: 4
+    portrait: {fileID: 21300000, guid: f6f1823e85c5b7641ab7025ca8ce9af6, type: 3}
