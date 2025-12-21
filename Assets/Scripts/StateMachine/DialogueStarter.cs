@@ -14,12 +14,12 @@ public class DialogueStarter
     
     public void Stop()
     {
-        _session.Stop();
+        _session.EndDialogue();
     }
     
     public void Restart(string routeKey, object payload = null)
     {
-        _session.Stop();
+        _session.EndDialogue();
         _session.StartDialogue(routeKey);
     }
     

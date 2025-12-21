@@ -12,7 +12,7 @@ public interface IDialoguePresenter
     // Present a non-dialogue system message (e.g., warnings, debug info, or status text).
     void PresentSystemMessage(string message);
     
-    void Clear();
+    void Hide();
 }
 
 public interface INodeExecutor

@@ -3,7 +3,7 @@ using UnityEngine;
 public interface IDialogueNodeOutput
 {
     void Show(NodeViewModel vm);
-    void Clear();
+    void Hide();
     void ShowSystemMessage(string msg);
     void PlayStep(DialogueNodeSpec node, int stepIndex, NodePlayScope scope, DialogueLine fallbackLine = null);
 }
@@ -25,7 +25,7 @@ public sealed class DialogueNodeOutputComposite : IDialogueNodeOutput
     }
 
 
-    public void Clear() => _presenter?.Clear();
+    public void Hide() => _presenter?.Hide();
     public void ShowSystemMessage(string msg) => _presenter?.PresentSystemMessage(msg);
     
     public void PlayStep(DialogueNodeSpec node, int stepIndex, NodePlayScope scope, DialogueLine fallbackLine = null)

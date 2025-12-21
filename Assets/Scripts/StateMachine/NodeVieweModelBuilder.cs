@@ -1,85 +1,70 @@
 using System.Collections.Generic;
 
-public class NodeViewModelBuilder
+public sealed class NodeViewModelBuilder
 {
     public NodeViewModel Build(SituationSpecSO situation, DialogueRuntimeState state)
     {
-        // 생존성 가드
-        if (state == null)
-            return NodeViewModel.System("(none)", -1, "State is null.");
+        int nodeIndex = state.CurrentNodeIndex;
+        int stepIndex = state.StepGate.StepIndex;
 
-        if (situation == null || situation.nodes == null)
-            return NodeViewModel.System(state.SituationKey, state.CurrentNodeIndex, $"Missing SituationSpec: '{state.SituationKey}'");
+        DialogueNodeSpec node = situation.nodes[nodeIndex];
 
-        if (state.CurrentNodeIndex < 0 || state.CurrentNodeIndex >= situation.nodes.Count)
-            return NodeViewModel.System(state.SituationKey, state.CurrentNodeIndex, $"Invalid NodeCursor={state.CurrentNodeIndex}");
-
-        var node = situation.nodes[state.CurrentNodeIndex];
-        if (node == null || node.steps == null || node.steps.Count == 0)
-        {
-            return new NodeViewModel(
-                state.SituationKey,
-                state.CurrentNodeIndex,
-                string.Empty,
-                string.Empty,
-                Expression.Default,
-                DialoguePosition.Left,
-                state.BranchKey,
-                state.VariantKey,
-                state.StepGateTokenCount 
-            );
-        }
-
-        // 핵심: "현재 step"에서 대표 라인 찾기
-        int stepIndex = state.StepGate.StepIndex; // GateCursor.TokenCursor == 현재 step index 라는 전제
-        DialogueLine line = null;
-
-        if (stepIndex >= 0 && stepIndex < node.steps.Count)
-        {
-            var step = node.steps[stepIndex];
-            line = FindPrimaryLine(step?.commands);
-        }
-
-        // fallback: 현재 step에 라인이 없으면, 노드 전체 steps에서 첫 라인 탐색
-        if (line == null)
-            line = FindPrimaryLine(node);
+        DialogueLine line = GetPrimaryLine(node, stepIndex);
 
         return new NodeViewModel(
-            state.SituationKey,
-            state.CurrentNodeIndex,
-            line?.speakerId ?? string.Empty,
-            line?.text ?? string.Empty,
-            line?.expression ?? Expression.Default,
-            line?.position ?? DialoguePosition.Left,
-            state.BranchKey,
-            state.VariantKey,
-            state.StepGateTokenCount
+            situationKey: state.SituationKey,
+            nodeIndex: nodeIndex,
+            stepIndex: stepIndex,
+            speakerId: line?.speakerId ?? string.Empty,
+            text: line?.text ?? string.Empty,
+            expression: line?.expression ?? Expression.Default,
+            position: line?.position ?? DialoguePosition.Left,
+            branchKey: state.BranchKey,
+            variantKey: state.VariantKey,
+            stepGateTokenCount: state.StepGateTokenCount
         );
     }
 
-    private static DialogueLine FindPrimaryLine(DialogueNodeSpec node)
+    private DialogueLine GetPrimaryLine(DialogueNodeSpec node, int stepIndex)
     {
-        if (node?.steps == null) return null;
-
-        for (int i = 0; i < node.steps.Count; i++)
+        // 1) current step first
+        if (node.steps != null && stepIndex >= 0 && stepIndex < node.steps.Count)
         {
-            var step = node.steps[i];
-            var line = FindPrimaryLine(step?.commands);
-            if (line != null) return line;
+            List<NodeCommandSpec> commands = node.steps[stepIndex]?.commands;
+            DialogueLine line = FirstShowLine(commands);
+            
+            if (line != null)
+                return line;
         }
+
+        // 2) fallback: scan all steps
+        if (node.steps != null)
+        {
+            for (int step = 0; step < node.steps.Count; step++)
+            {
+                List<NodeCommandSpec> commands = node.steps[step]?.commands;
+                DialogueLine line = FirstShowLine(commands);
+                
+                if (line != null)
+                    return line;
+            }
+        }
+
         return null;
     }
 
-    private static DialogueLine FindPrimaryLine(IReadOnlyList<NodeCommandSpec> specs)
+    private DialogueLine FirstShowLine(List<NodeCommandSpec> commands)
     {
-        if (specs == null) return null;
+        if (commands == null)
+            return null;
 
-        for (int i = 0; i < specs.Count; i++)
+        for (int i = 0; i < commands.Count; i++)
         {
-            var spec = specs[i];
+            NodeCommandSpec spec = commands[i];
             if (spec != null && spec.kind == NodeCommandKind.ShowLine && spec.line != null)
                 return spec.line;
         }
+        
         return null;
     }
 }

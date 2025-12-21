@@ -89,7 +89,7 @@ public sealed class DialogueSession
                 {
                     _gateAdvancer.ClearLatchedSignals();
                     _output.ShowSystemMessage("(End of Situation)");
-                    Stop();
+                    EndDialogue();
                     return;
                 }
                 
@@ -97,25 +97,25 @@ public sealed class DialogueSession
                 _gatePlanner.BuildForCurrentNode(_situation, ref _state);
 
                 // 다음 노드의 step 0 실행
-                EnterStep();
+                PresentAndPlayCurrentStep();
                 return;
             }
 
             // 아직 노드가 끝난 건 아니면 -> 다음 step 진입
-            EnterStep();
+            PresentAndPlayCurrentStep();
 
             // EnterStep이 커맨드를 재생하면 Busy가 켜지고,
             // 다음 루프에서 GateRunner.Tick이 막히므로 자연스럽게 여기서 멈춘다.
         }
     }
     
-    public void Stop()
+    public void EndDialogue()
     {
         _situation = null;
         _state = null;
         
-        _output.Clear();
         _gateAdvancer.ClearLatchedSignals();
+        _output.Hide();
     }
     
     #endregion
@@ -141,14 +141,14 @@ public sealed class DialogueSession
         };
     }
 
-    private void EnterStep()
+    private void PresentAndPlayCurrentStep()
     {
         if (_situation == null || _state == null) return;
         if (_state.CurrentNodeIndex < 0 || _state.CurrentNodeIndex >= _situation.nodes.Count) return;
 
-        Debug.Log($"[Gate] tokens={_state.StepGate.Tokens?.Count ?? -1}, cursor={_state.StepGate.StepIndex}");
+        //Debug.Log($"[Gate] tokens={_state.StepGate.Tokens?.Count ?? -1}, cursor={_state.StepGate.StepIndex}");
 
-        // ✅ stepIndex 기반 VM
+        
         NodeViewModel viewModel = _vmBuilder.Build(_situation, _state);
         _output.Show(viewModel);
 
