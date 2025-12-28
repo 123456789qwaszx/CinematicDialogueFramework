@@ -1,5 +1,8 @@
 using UnityEngine;
 
+// DialogueSession is the sole owner of dialogue time progression.
+// All other components may report state or perform execution,
+// but only Tick() is allowed to advance steps or nodes.
 public sealed class DialogueSession
 {
     private const string FallbackRouteKey = "Default";
@@ -73,6 +76,8 @@ public sealed class DialogueSession
 
     public void Tick()
     {
+        // === TIME PROGRESSION BEGINS ===
+        
         if (_situation == null || _state == null) return;
 
         while (true)
@@ -83,6 +88,7 @@ public sealed class DialogueSession
 
             if (_state.IsNodeStepsCompleted )
             {
+                // ---- Node boundary ----
                 _state.CurrentNodeIndex++;
 
                 if (_state.CurrentNodeIndex >= _situation.nodes.Count)
@@ -101,11 +107,10 @@ public sealed class DialogueSession
                 return;
             }
 
-            // 아직 노드가 끝난 건 아니면 -> 다음 step 진입
+            // ---- Step boundary ----
             PresentAndPlayCurrentStep();
-
-            // EnterStep이 커맨드를 재생하면 Busy가 켜지고,
-            // 다음 루프에서 GateRunner.Tick이 막히므로 자연스럽게 여기서 멈춘다.
+            
+            // === TIME PROGRESSION ENDS ===
         }
     }
     
