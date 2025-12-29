@@ -6,7 +6,7 @@ using UnityEngine;
 public sealed class DialogueSession
 {
     private const string FallbackRouteKey = "Default";
-    
+
     // Dependencies (injected)
     private readonly DialogueResolver _resolver;
     private readonly StepGatePlanBuilder _gatePlanner;
@@ -14,19 +14,19 @@ public sealed class DialogueSession
     private readonly NodeViewModelBuilder _vmBuilder;
     private readonly IDialogueNodeOutput _output;
     private readonly DialogueRouteCatalogSO _routeCatalog;
-    
+
     private readonly CommandService _commandService;
-    
+
     public DialogueContext Context { get; }
     private readonly NodePlayScope _nodeScope;
 
     // Runtime state
     private SituationSpecSO _situation;
     private DialogueRuntimeState _state;
-    
-    
+
+
     // Public surface
-    
+
     // Ctor
     public DialogueSession(
         DialogueResolver resolver,
@@ -49,14 +49,14 @@ public sealed class DialogueSession
         Context = new DialogueContext { Modes = modes };
         _nodeScope = new NodePlayScope(commandService, Context);
     }
-    
-    
+
+
     //_nodeScope ??= new NodePlayScope(_commandService, Context);
+
     #region Public API
 
     public void StartDialogue(string routeKey)
     {
-        
         _state = CreateInitialState(routeKey);
         if (_state == null)
         {
@@ -67,29 +67,34 @@ public sealed class DialogueSession
         _situation = _resolver.Resolve(routeKey);
         if (_situation == null)
         {
-            Debug.LogWarning($"Missing SituationSpec. situationKey='{_state.SituationKey}', routeKey='{_state.RouteKey}'");
+            Debug.LogWarning(
+                $"Missing SituationSpec. situationKey='{_state.SituationKey}', routeKey='{_state.RouteKey}'");
             return;
         }
-        
-        _gatePlanner.BuildForCurrentNode(_situation, ref _state);
+
+        _gatePlanner.BuildForCurrentNode(_situation, _state);
     }
 
     public void Tick()
     {
         // === TIME PROGRESSION BEGINS ===
-        
+
         if (_situation == null || _state == null) return;
 
         while (true)
         {
-            bool consumed = _gateAdvancer.TryConsume(_state, Context);
-            if (!consumed)
+            bool advanced = _gateAdvancer.TryAdvanceStepGate(_state, Context);
+            if (!advanced)
                 break;
 
-            if (_state.IsNodeStepsCompleted )
+            int currentNode = _state.CurrentNodeIndex;
+            int currentStep = _state.StepGate.StepIndex;
+
+            if (_state.IsNodeStepsCompleted)
             {
                 // ---- Node boundary ----
                 _state.CurrentNodeIndex++;
+                int newNodeIndex = _state.CurrentNodeIndex;
 
                 if (_state.CurrentNodeIndex >= _situation.nodes.Count)
                 {
@@ -98,35 +103,35 @@ public sealed class DialogueSession
                     EndDialogue();
                     return;
                 }
-                
-                _gateAdvancer.ClearLatchedSignals();
-                _gatePlanner.BuildForCurrentNode(_situation, ref _state);
 
-                // 다음 노드의 step 0 실행
-                PresentAndPlayCurrentStep();
+                _gateAdvancer.ClearLatchedSignals();
+                _gatePlanner.BuildForCurrentNode(_situation, _state);
+
+                int firstStep = _state.StepGate.StepIndex;
+                PresentAndPlayCurrentStep(newNodeIndex, firstStep);
                 return;
             }
 
             // ---- Step boundary ----
-            PresentAndPlayCurrentStep();
-            
-            // === TIME PROGRESSION ENDS ===
+            PresentAndPlayCurrentStep(currentNode, currentStep);
         }
+
+        // === TIME PROGRESSION ENDS ===
     }
-    
+
     public void EndDialogue()
     {
         _situation = null;
         _state = null;
-        
+
         _gateAdvancer.ClearLatchedSignals();
         _output.Hide();
     }
-    
+
     #endregion
-    
+
     #region internal helpers
-    
+
     private DialogueRuntimeState CreateInitialState(string routeKey)
     {
         if (!_routeCatalog.TryGetRoute(routeKey, out DialogueRoute route))
@@ -146,24 +151,18 @@ public sealed class DialogueSession
         };
     }
 
-    private void PresentAndPlayCurrentStep()
+    private void PresentAndPlayCurrentStep(int nodeIndex, int stepIndex)
     {
-        if (_situation == null || _state == null) return;
-        if (_state.CurrentNodeIndex < 0 || _state.CurrentNodeIndex >= _situation.nodes.Count) return;
-
+        if (nodeIndex < 0 || nodeIndex >= _situation.nodes.Count)
+            return;
         //Debug.Log($"[Gate] tokens={_state.StepGate.Tokens?.Count ?? -1}, cursor={_state.StepGate.StepIndex}");
 
-        
         NodeViewModel viewModel = _vmBuilder.Build(_situation, _state);
         _output.Show(viewModel);
 
-        DialogueNodeSpec node = _situation.nodes[_state.CurrentNodeIndex];
-
-        int stepIndex = _state.StepGate.StepIndex;
-
-        // ✅ 여기서 반드시 "현재 stepIndex"를 재생해야 Step1+가 이어진다
+        DialogueNodeSpec node = _situation.nodes[nodeIndex];
         _output.PlayStep(node, stepIndex, _nodeScope);
     }
-    
+
     #endregion
 }

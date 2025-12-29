@@ -37,10 +37,11 @@ public class StepGateAdvancer : IDisposable
     }
 
     /// <summary>
-    /// Tries to consume the current step gate token.
-    /// Returns true if one token was consumed (StepIndex advanced), otherwise false.
+    /// Tries to advance the step gate:
+    /// - On success: StepGate.StepIndex is advanced (or skipped to end).
+    /// - On failure: blocked by input/time/signal/busy state.
     /// </summary>
-    public bool TryConsume(DialogueRuntimeState state, DialogueContext ctx)
+    public bool TryAdvanceStepGate(DialogueRuntimeState state, DialogueContext ctx)
     {
         if (state.StepGate.Tokens == null || state.StepGate.StepIndex >= state.StepGate.Tokens.Count)
             return false;
@@ -58,10 +59,10 @@ public class StepGateAdvancer : IDisposable
             return true;
         }
 
-        var tokenOpt = state.StepGate.CurrentToken;
+        GateToken? tokenOpt = state.StepGate.CurrentToken;
         if (tokenOpt == null) return false;
 
-        var token = tokenOpt.Value;
+        GateToken token = tokenOpt.Value;
 
         switch (token.type)
         {
