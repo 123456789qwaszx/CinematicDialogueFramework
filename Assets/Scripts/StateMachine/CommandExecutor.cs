@@ -1,37 +1,31 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 using UnityEngine;
 
 public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
 {
-    [Header("Trace")]
-    [SerializeField] private bool enableTrace = true;
-    [SerializeField] private bool logTraceStreaming = false;
-    [SerializeField] private bool logTraceDumpOnNodeEnd = true;
+    [Header("Debug")]
+    [SerializeField] private bool enableDebugLog = true;
 
-    [SerializeField, TextArea(3, 20)] private string tracePreview;
-
-    private readonly StringBuilder _trace = new StringBuilder(4096);
-    private const int MaxTraceChars = 20000;
-
-    private SequencePlayer _player;
+    // ---- Dependencies (set by Initialize) ----
+    private SequencePlayer _sequencePlayer;
     private INodeCommandFactory _commandFactory;
 
+    // ---- Runtime state: execution ----
     private CancellationTokenSource _cts;
     private Coroutine _mainRoutine;
-
     private NodePlayScope _activeScope;
 
-    private int _runId = 0;
-    private bool _isStopping = false;
-    private bool _isInitialized = false;
+    // ---- Runtime state: control flags ----
+    private int _runId;
+    private bool _isStopInProgress;
+    private bool _isInitialized;
 
-    public void Initialize(SequencePlayer player, INodeCommandFactory commandFactory)
+    public void Initialize(SequencePlayer sequencePlayer, INodeCommandFactory commandFactory)
     {
-        _player = player;
+        _sequencePlayer = sequencePlayer;
         _commandFactory = commandFactory;
         _isInitialized = true;
     }
@@ -39,96 +33,57 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
     private void OnDisable() => Stop();
     private void OnDestroy() => Stop();
     
-    /// <summary>
-    /// ✅ Step 기반 재생: 현재 step의 commands만 실행한다.
-    /// </summary>
+    
     public void PlayStep(DialogueNodeSpec node, int stepIndex, NodePlayScope scope, DialogueLine fallbackLine = null)
     {
         if (!_isInitialized)
-        {
-            Debug.LogError("[CommandExecutor] Play called before Initialize().", this);
             return;
-        }
-
-        if (node == null || scope == null) return;
+        if (node == null || scope == null)
+            return;
 
         Stop();
-        ClearTrace();
-
-        var commands = BuildCommandsFromStep(node, stepIndex);
-
-        if ((commands == null || commands.Count == 0) && fallbackLine != null)
-            commands = new List<ISequenceCommand> { new ShowLineCommand(fallbackLine) };
-
+        List<ISequenceCommand> commands = BuildCommandsFromStep(node, stepIndex);
         if (commands == null || commands.Count == 0)
         {
-            Trace($"Step Play skipped: stepIndex={stepIndex} (no commands)");
-            return;
+            if (fallbackLine != null)
+            {
+                commands = new List<ISequenceCommand> { new ShowLineCommand(fallbackLine) };
+            }
+            else
+            {
+                Log($"Step skipped: stepIndex={stepIndex} (no commands)");
+                return;
+            }
         }
-
-        Trace($"Step Play: stepIndex={stepIndex}, commands={commands.Count}");
-
+        
         _activeScope = scope;
-
+        
         ResetToken();
         _activeScope.Token = _cts.Token;
-
-        int capturedRunId = _runId;
-        _mainRoutine = StartCoroutine(RunNode(commands, _activeScope, capturedRunId));
+        
+        Log($"Step Play: stepIndex={stepIndex}, commands={commands.Count}");
+        _mainRoutine = StartCoroutine(RunNode(commands, _activeScope, _runId));
     }
-
-    public void Stop()
-    {
-        if (_isStopping) return;
-        _isStopping = true;
-
-        try
-        {
-            _runId++;
-            CancelTokenOnly();
-
-            if (_mainRoutine != null)
-            {
-                StopCoroutine(_mainRoutine);
-                _mainRoutine = null;
-            }
-
-            _player?.Stop();
-
-            if (_activeScope != null)
-            {
-                _activeScope.SetNodeBusy(false);
-                _activeScope.Token = CancellationToken.None;
-                _activeScope = null;
-            }
-
-            DisposeToken();
-
-            Trace("Stop()");
-            if (logTraceDumpOnNodeEnd) DumpTraceToConsole("[CommandExecutor] Trace dump (Stop)");
-        }
-        finally
-        {
-            _isStopping = false;
-        }
-    }
-
+    
     private IEnumerator RunNode(List<ISequenceCommand> commands, NodePlayScope scope, int runId)
     {
-        if (commands == null || scope == null) yield break;
-        if (runId != _runId) yield break;
+        if (runId != _runId)
+        {
+            Log($"RunNode exited early: stale runId={runId}, current={_runId}");
+            yield break;
+        }
 
         scope.SetNodeBusy(true);
-        Trace($"Node Begin (runId={runId})");
-
+        
+        Log($"Node Begin (runId={runId})");
         try
         {
-            yield return _player.PlayCommands(
+            yield return _sequencePlayer.PlayCommands(
                 commands,
                 scope,
                 runId: runId,
-                isValid: () => runId == _runId && !_isStopping,
-                trace: Trace
+                isValid: () => runId == _runId,
+                trace: msg => Log(msg)
             );
         }
         finally
@@ -143,108 +98,94 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
 
                 _mainRoutine = null;
 
-                Trace($"Node End (runId={runId})");
-                DisposeToken();
-
-                if (logTraceDumpOnNodeEnd)
-                    DumpTraceToConsole("[CommandExecutor] Trace dump (Node End)");
+                Log($"Node End (runId={runId})");
             }
         }
     }
+    
+    public void Stop()
+    {
+        if (_isStopInProgress)
+            return;
+        
+        _isStopInProgress = true;
+
+        try
+        {
+            // Bump run generation so all in-flight routines from the previous session become invalid.
+            _runId++;
+            CancelAndDisposeToken();
+
+            if (_mainRoutine != null)
+            {
+                StopCoroutine(_mainRoutine);
+                _mainRoutine = null;
+            }
+
+            _sequencePlayer?.Stop();
+
+            if (_activeScope != null)
+            {
+                _activeScope.SetNodeBusy(false);
+                _activeScope.Token = CancellationToken.None;
+                _activeScope = null;
+            }
+
+            Log("Stop() called");
+        }
+        finally
+        {
+            _isStopInProgress = false;
+        }
+    }
+    
 
     private List<ISequenceCommand> BuildCommandsFromStep(DialogueNodeSpec node, int stepIndex)
     {
         var list = new List<ISequenceCommand>();
 
-        if (node == null || node.steps == null || node.steps.Count == 0)
-            return list;
-
-        if (_commandFactory == null)
+        if (node.steps == null || node.steps.Count == 0)
         {
-            Debug.LogError("[CommandExecutor] CommandFactory is null. Did you call Initialize()?", this);
+            Log($"Node Empty (node={node})");
             return list;
         }
-
         if (stepIndex < 0 || stepIndex >= node.steps.Count)
         {
-            Trace($"Invalid stepIndex: {stepIndex} (steps={node.steps.Count})");
+            Log($"Invalid stepIndex: {stepIndex} (steps={node.steps.Count})");
             return list;
         }
 
-        var step = node.steps[stepIndex];
+        DialogueStepSpec step = node.steps[stepIndex];
         if (step == null || step.commands == null || step.commands.Count == 0)
-            return list;
-
-        foreach (var spec in step.commands)
         {
-            if (spec == null) continue;
+            Log($"Step Empty (step={step})");
+            return list;
+        }
 
-            if (_commandFactory.TryCreate(spec, out var cmd) && cmd != null)
-                list.Add(cmd);
-            else
-                Trace($"Unsupported command kind: {spec.kind}");
+        foreach (NodeCommandSpec spec in step.commands)
+        {
+            if (!_commandFactory.TryCreate(spec, out ISequenceCommand cmd))
+            {
+                Log($"failed to create command (spec={spec})");
+                continue;
+            }
+            
+            list.Add(cmd);
         }
 
         return list;
     }
-
-    // ----------------------
-    // Trace helpers
-    // ----------------------
-
-    private void Trace(string msg)
-    {
-        if (!enableTrace) return;
-
-        if (_trace.Length > MaxTraceChars)
-            _trace.Remove(0, _trace.Length - (MaxTraceChars / 2));
-
-        string line = $"[{Time.frameCount}] {msg}";
-
-        _trace.AppendLine(line);
-        tracePreview = _trace.ToString();
-
-        if (logTraceStreaming)
-            Debug.Log(line, this);
-    }
-
-    private void DumpTraceToConsole(string header)
-    {
-        if (!enableTrace) return;
-        Debug.Log($"{header}\n{_trace}", this);
-    }
-
-    public void ClearTrace()
-    {
-        _trace.Clear();
-        tracePreview = "";
-    }
-
-    // ----------------------
-    // Token lifecycle
-    // ----------------------
-
+    
     private void ResetToken()
-    {
-        DisposeToken();
+    { // 새 실행용 토큰 생성만 담당
+        _cts?.Dispose();
         _cts = new CancellationTokenSource();
     }
-
-    private void CancelTokenOnly()
+    
+    private void CancelAndDisposeToken()
     {
-        if (_cts == null) return;
-
-        try
-        {
-            if (!_cts.IsCancellationRequested)
-                _cts.Cancel();
-        }
-        catch (ObjectDisposedException) { }
-    }
-
-    private void DisposeToken()
-    {
-        if (_cts == null) return;
+        if (_cts == null)
+            return;
 
         try
         {
@@ -255,5 +196,12 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
 
         _cts.Dispose();
         _cts = null;
+    }
+    
+    
+    private void Log(string msg)
+    {
+        if (!enableDebugLog) return;
+        Debug.Log($"[CommandExecutor] {msg}", this);
     }
 }

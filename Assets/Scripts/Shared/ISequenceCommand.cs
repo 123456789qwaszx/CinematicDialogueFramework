@@ -4,5 +4,5 @@ public interface ISequenceCommand
 {
     bool WaitForCompletion { get; }
 
-    IEnumerator Execute(NodePlayScope ctx);
+    IEnumerator Execute(NodePlayScope api);
 }

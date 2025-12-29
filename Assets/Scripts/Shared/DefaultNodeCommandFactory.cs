@@ -3,7 +3,9 @@ public sealed class DefaultNodeCommandFactory : INodeCommandFactory
     public bool TryCreate(NodeCommandSpec spec, out ISequenceCommand command)
     {
         command = null;
-        if (spec == null) return false;
+        
+        if (spec == null)
+            return false;
 
         switch (spec.kind)
         {
