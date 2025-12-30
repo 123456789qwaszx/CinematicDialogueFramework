@@ -281,10 +281,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5a3f81eaca50f144ab19e60b4c29c1c9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Dialogue.Presentation::CommandExecutor
-  enableTrace: 1
-  logTraceStreaming: 1
-  logTraceDumpOnNodeEnd: 1
-  tracePreview: 
+  enableDebugLog: 0
 --- !u!4 &35710889
 Transform:
   m_ObjectHideFlags: 0
@@ -344,6 +341,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9c2792edb4e770e46b744342b684a8ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIDialoguePresenterTMP
+  root: {fileID: 0}
   speaker: {fileID: 1184554652}
   body: {fileID: 1629982602}
 --- !u!1 &330585543
@@ -2634,7 +2632,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Dialogue.StateMachine::DialogueBootstrap
   routeCatalog: {fileID: 11400000, guid: 4ccfb75bb8d02dd488dabd3881e57edf, type: 2}
-  commandServiceConfig: {fileID: 0}
+  commandServiceConfig: {fileID: 11400000, guid: ad6a036cd11e1454baf8edcef05b855f, type: 2}
   presenterBehaviour: {fileID: 279543600}
   commandExecuter: {fileID: 35710888}
   signals: {fileID: 1945730144}
@@ -3760,11 +3758,11 @@ SceneRoots:
   - {fileID: 694275957}
   - {fileID: 986883646}
   - {fileID: 279543599}
+  - {fileID: 35710889}
   - {fileID: 1945730143}
   - {fileID: 1642843086}
   - {fileID: 1644391589}
   - {fileID: 1814730816}
   - {fileID: 572829971}
   - {fileID: 1558866247}
-  - {fileID: 35710889}
   - {fileID: 590301590}

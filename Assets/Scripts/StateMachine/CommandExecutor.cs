@@ -47,7 +47,9 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         {
             if (fallbackLine != null)
             {
-                commands = new List<ISequenceCommand> { new ShowLineCommand(fallbackLine) };
+                _commandFactory.TryCreate(
+                    new NodeCommandSpec { line = fallbackLine}, out ISequenceCommand fallbackCommand);
+                commands = new List<ISequenceCommand> { fallbackCommand };
             }
             else
             {

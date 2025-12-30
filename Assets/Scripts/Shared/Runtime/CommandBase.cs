@@ -35,13 +35,13 @@ public abstract class CommandBase : ISequenceCommand
         }
 
         IEnumerator inner = null;
-        try { inner = ExecuteInner(api); }
+        try { inner = ExecuteInner(); }
         catch (System.Exception e) { Debug.LogException(e); yield break; }
 
         if (inner != null) yield return inner;
     }
 
-    protected abstract IEnumerator ExecuteInner(NodePlayScope api);
+    protected abstract IEnumerator ExecuteInner();
 
     protected virtual void OnSkip(NodePlayScope api) { }
 

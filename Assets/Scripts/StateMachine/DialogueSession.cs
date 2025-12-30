@@ -15,8 +15,6 @@ public sealed class DialogueSession
     private readonly IDialogueNodeOutput _output;
     private readonly DialogueRouteCatalogSO _routeCatalog;
 
-    private readonly CommandService _commandService;
-
     public DialogueContext Context { get; }
     private readonly NodePlayScope _nodeScope;
 
@@ -35,7 +33,6 @@ public sealed class DialogueSession
         NodeViewModelBuilder vmBuilder,
         IDialogueNodeOutput output,
         DialogueRouteCatalogSO routeCatalog,
-        CommandService commandService,
         DialoguePlaybackModes modes
     )
     {
@@ -45,9 +42,8 @@ public sealed class DialogueSession
         _vmBuilder = vmBuilder;
         _output = output;
         _routeCatalog = routeCatalog;
-        _commandService = commandService;
         Context = new DialogueContext { Modes = modes };
-        _nodeScope = new NodePlayScope(commandService, Context);
+        _nodeScope = new NodePlayScope(Context);
     }
 
 
@@ -161,7 +157,7 @@ public sealed class DialogueSession
         _output.Show(viewModel);
 
         DialogueNodeSpec node = _situation.nodes[nodeIndex];
-        _output.PlayStep(node, stepIndex, _nodeScope);
+        _output.PlayStep(node, stepIndex, _nodeScope, fallbackLine : new DialogueLine());
     }
 
     #endregion

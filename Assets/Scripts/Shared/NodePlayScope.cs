@@ -2,17 +2,14 @@ using System.Threading;
 
 public class NodePlayScope
 {
-    public IPresentationPort Presenter { get; }
     public DialogueContext Playback { get; }
     public CancellationToken Token { get; set; }
     
-    public NodePlayScope(IPresentationPort port, DialogueContext state)
+    public NodePlayScope(DialogueContext state)
     {
-        Presenter = port;
         Playback = state;
         Token = CancellationToken.None;
     }
-    
     
     public bool IsSkipping => Playback != null && Playback.IsSkipping;
     public bool IsAutoMode => Playback != null && Playback.IsAutoMode;

@@ -32,18 +32,30 @@ public sealed class DialogueBootstrap : MonoBehaviour
         StepGateAdvancer gateRunner = new StepGateAdvancer(input, time, signals);
 
         // Optional extension ports
-        CommandService service = new CommandService(commandServiceConfig);
+        //CommandService service = new CommandService(commandServiceConfig);
         CommandExecutor executor = commandExecuter as CommandExecutor;
         SequencePlayer sequencePlayer = new(executor);
-        DefaultNodeCommandFactory nodeFactory = new DefaultNodeCommandFactory();
+        
+        CommandServiceConfig config = commandServiceConfig;
+        if (config == null)
+        {
+            Debug.LogError("[DialogueBootstrap] CommandServiceConfig is not assigned.");
+            return;
+        }
+        
+        DefaultNodeCommandFactory nodeFactory = new DefaultNodeCommandFactory(
+            config.DialogueViewService,
+            config.CameraShakeService);
+        
         executor.Initialize(sequencePlayer, nodeFactory);
+        
         DialoguePlaybackModes playbackModes = new ();
         
         // Compose output ports
         DialogueNodeOutputComposite output = new ((IDialoguePresenter)presenterBehaviour, (INodeExecutor)commandExecuter);
 
         
-        DialogueSession session  = new (resolver, gatePlanner, gateRunner, vmBuilder, output, routeCatalog, service, playbackModes);
+        DialogueSession session  = new (resolver, gatePlanner, gateRunner, vmBuilder, output, routeCatalog, playbackModes);
 
         _session = session;
         _gateRunner = gateRunner;

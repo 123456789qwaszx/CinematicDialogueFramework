@@ -6,6 +6,7 @@ public class DefaultDialogueViewAsset : DialogueViewAsset
 {
     public override IEnumerator ShowLine(DialogueLine line)
     {
+        Debug.Log("[DialogueBootstrap] Showing line " + line);
         //UIDialogue ui = UIManager.Instance.GetUI<UIDialogue>();
 
         yield return null; //ui?.ShowLineCoroutine(line, ctx);

@@ -9,10 +9,10 @@ public enum DialoguePosition { Left, Center, Right }
 [Serializable]
 public class DialogueLine
 {
-    public string speakerId;
-    public Expression expression;
-    [TextArea(3, 10)] public string text;
-    public DialoguePosition position;
+    public string speakerId = "";
+    public Expression expression = Expression.Default;
+    [TextArea(3, 10)] public string text = "";
+    public DialoguePosition position = DialoguePosition.Left;
 }
 #endregion
 
