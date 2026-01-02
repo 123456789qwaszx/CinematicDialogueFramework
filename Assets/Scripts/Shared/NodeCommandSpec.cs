@@ -22,6 +22,10 @@ public sealed class NodeCommandSpec
 
     [Header("ShowLine")]
     public DialogueLine line;
+    
+    [Header("UI Target")]
+    public string screenId;
+    public string widgetId;
 
     [Header("ShakeCamera")]
     public float shakeStrength = 1f;

@@ -38,7 +38,7 @@ public sealed class DefaultNodeCommandFactory : INodeCommandFactory
         if (spec.line == null || _dialoguePresentation == null)
             return null;
 
-        return new ShowLineCommand(_dialoguePresentation, spec.line);
+        return new ShowLineCommand(_dialoguePresentation, spec.line, spec.screenId, spec.widgetId);
     }
 
     private ISequenceCommand CreateShakeCamera(NodeCommandSpec spec)

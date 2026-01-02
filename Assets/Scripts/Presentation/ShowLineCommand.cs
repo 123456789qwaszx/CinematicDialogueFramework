@@ -4,11 +4,15 @@ public sealed class ShowLineCommand : CommandBase
 {
     private readonly IDialogueViewService _presentation;
     private readonly DialogueLine _line;
+    private readonly string _screenId;
+    private readonly string _widgetId;
     
-    public ShowLineCommand(IDialogueViewService presentation, DialogueLine line)
+    public ShowLineCommand(IDialogueViewService presentation, DialogueLine line, string screenId, string widgetId)
     {
         _presentation = presentation;
         _line = line;
+        _screenId = screenId;
+        _widgetId = widgetId;
     }
 
 
@@ -16,7 +20,7 @@ public sealed class ShowLineCommand : CommandBase
 
     protected override IEnumerator ExecuteInner()
     {
-        IEnumerator routine = _presentation.ShowLine(_line);
+        IEnumerator routine = _presentation.ShowLine(_line,_screenId, _widgetId);
         
         if (routine != null)
             yield return routine;
@@ -24,6 +28,6 @@ public sealed class ShowLineCommand : CommandBase
 
     protected override void OnSkip(NodePlayScope api)
     {
-        _presentation.ShowLineImmediate(_line);
+        _presentation.ShowLineImmediate(_line,_screenId, _widgetId);
     }
 }
