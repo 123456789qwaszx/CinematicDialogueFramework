@@ -7,17 +7,20 @@ using UnityEngine;
 
 public abstract class CommandBase : ISequenceCommand
 {
+    public string DebugName => GetType().Name;
+    // 스킵이면 그냥 안 해도 되는 단순 SFX, 장식 파티클, 작은 흔들림 등은 Ignore로 override
+    // 대사 출력/로그/시그널 발행 같은 커맨드는 ExecuteEvenIfSkipping으로 override
+    protected virtual SkipPolicy SkipPolicy => SkipPolicy.CompleteImmediately;
+    
     public virtual bool WaitForCompletion => true;
-    public virtual string DebugName => GetType().Name;
+    protected bool IsCancelled(NodePlayScope scope) => scope.Token.IsCancellationRequested;
 
-    public virtual SkipPolicy SkipPolicy => SkipPolicy.Ignore;
-
-    public IEnumerator Execute(NodePlayScope api)
+    public IEnumerator Execute(NodePlayScope scope)
     {
-        if (api == null) yield break;
-        if (api.Token.IsCancellationRequested) yield break;
+        if (scope == null) yield break;
+        if (scope.Token.IsCancellationRequested) yield break;
 
-        if (api.IsSkipping)
+        if (scope.IsSkipping)
         {
             switch (SkipPolicy)
             {
@@ -25,7 +28,7 @@ public abstract class CommandBase : ISequenceCommand
                     yield break;
 
                 case SkipPolicy.CompleteImmediately:
-                    try { OnSkip(api); }
+                    try { OnSkip(scope); }
                     catch (System.Exception e) { Debug.LogException(e); }
                     yield break;
 
@@ -35,26 +38,36 @@ public abstract class CommandBase : ISequenceCommand
         }
 
         IEnumerator inner = null;
-        try { inner = ExecuteInner(); }
+        try { inner = ExecuteInner(scope); }
         catch (System.Exception e) { Debug.LogException(e); yield break; }
 
         if (inner != null) yield return inner;
     }
 
-    protected abstract IEnumerator ExecuteInner();
+    protected abstract IEnumerator ExecuteInner(NodePlayScope scope);
 
-    protected virtual void OnSkip(NodePlayScope api) { }
-
-    protected IEnumerator Wait(NodePlayScope api, float seconds)
+    protected virtual void OnSkip(NodePlayScope scope) { }
+    
+    protected IEnumerator Wait(NodePlayScope scope, float seconds)
     {
-        float t = 0f;
-        while (t < seconds)
+        float elapsed = 0f;
+        while (elapsed < seconds)
         {
-            if (api.Token.IsCancellationRequested) yield break;
-            if (api.IsSkipping) yield break;
+            if (scope.Token.IsCancellationRequested) yield break;
 
-            // GateRunner와 동일 철학: unscaled + api.TimeScale
-            t += Time.unscaledDeltaTime * api.TimeScale;
+            if (scope.IsSkipping)
+            {
+                if (SkipPolicy == SkipPolicy.CompleteImmediately)
+                {
+                    try { OnSkip(scope); }
+                    catch (System.Exception e) { Debug.LogException(e); }
+                }
+                
+                yield break;
+            }
+
+            elapsed += Time.unscaledDeltaTime * scope.TimeScale;
+            
             yield return null;
         }
     }

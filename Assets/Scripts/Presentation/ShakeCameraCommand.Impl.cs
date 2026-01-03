@@ -12,11 +12,11 @@ public sealed class ShakeCameraCommand : CommandBase
         _strength = strength;
         _duration = duration;
     }
-
+    
+    protected override SkipPolicy SkipPolicy => SkipPolicy.Ignore;
     public override bool WaitForCompletion => false;
-    public override SkipPolicy SkipPolicy => SkipPolicy.Ignore;
-
-    protected override IEnumerator ExecuteInner()
+    
+    protected override IEnumerator ExecuteInner(NodePlayScope scope)
     {
         _cameraShake.Shake(_strength, _duration);
         yield break;
