@@ -20,7 +20,7 @@ public sealed class SequencePlayer
         _host = host;
     }
     
-    public IEnumerator PlayCommands(IReadOnlyList<ISequenceCommand> commands, NodePlayScope api, int runId,
+    public IEnumerator PlayCommands(IReadOnlyList<ISequenceCommand> commands, NodePlayScope scope, int runId,
         Func<bool> isValid, Action<string> trace = null)
     {
         bool Valid() => isValid();
@@ -38,7 +38,7 @@ public sealed class SequencePlayer
                 yield break;
             }
 
-            if (api.Token.IsCancellationRequested)
+            if (scope.Token.IsCancellationRequested)
             {
                 Trace($"[run:{runId}] Abort: token cancelled at idx={i + 1}/{total}");
                 yield break;
@@ -52,7 +52,7 @@ public sealed class SequencePlayer
             IEnumerator routine;
             try
             {
-                routine = command.Execute(api);
+                routine = command.Execute(scope);
             }
             catch (Exception e)
             {
@@ -69,7 +69,7 @@ public sealed class SequencePlayer
 
             if (command.WaitForCompletion)
             {
-                while (Valid() && !api.Token.IsCancellationRequested)
+                while (Valid() && !scope.Token.IsCancellationRequested)
                 {
                     bool movedNext;
 
@@ -95,11 +95,18 @@ public sealed class SequencePlayer
                 // ---- fire-and-forget commands ----
                 // These still run even after PlayCommands yield break
                 _activeBackgroundRoutines.Add(routine);
+                
+                // run(scope)에 귀속: Stop/Skip 시 끊을 수 있게 등록
+                scope.Track(
+                    cancel: () => { if (routine != null) _host.StopCoroutine(routine); },
+                    finish: () => { if (routine != null) _host.StopCoroutine(routine); } // finish는 "멈춤"까지만,
+                                                                                         // 완료 상태는 각 커맨드 루틴이 직접 ctx 확인 후, "최종 상태 세팅"을 시행하고 종료할 것
+                );
 
                 _host.StartCoroutine(
                     RunBackgroundRoutineToEnd(
                         routine,
-                        api,
+                        scope,
                         Valid,
                         onFinished: () => { _activeBackgroundRoutines.Remove(routine); }));
             }

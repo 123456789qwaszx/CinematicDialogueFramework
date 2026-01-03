@@ -92,6 +92,9 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         {
             if (runId == _runId && scope != null)
             {
+                CleanupPolicy policy = DecideCleanupPolicy(scope);
+                scope.Cleanup(policy);
+                
                 scope.SetNodeBusy(false);
                 scope.Token = CancellationToken.None;
 
@@ -100,7 +103,7 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
 
                 _mainRoutine = null;
 
-                Log($"Node End (runId={runId})");
+                Log($"Node End (runId={runId}, cleanup={policy})");
             }
         }
     }
@@ -128,6 +131,8 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
 
             if (_activeScope != null)
             {
+                _activeScope.Cleanup(CleanupPolicy.Cancel);
+                
                 _activeScope.SetNodeBusy(false);
                 _activeScope.Token = CancellationToken.None;
                 _activeScope = null;
@@ -205,5 +210,21 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
     {
         if (!enableDebugLog) return;
         Debug.Log($"[CommandExecutor] {msg}", this);
+    }
+    
+    private static CleanupPolicy DecideCleanupPolicy(NodePlayScope scope)
+    {
+        if (scope == null)
+            return CleanupPolicy.Cancel;
+
+        // Stop/Cancel이 Skip보다 강함
+        if (scope.Token.IsCancellationRequested)
+            return CleanupPolicy.Cancel;
+
+        // Skip은 "즉시 완료 상태"
+        if (scope.IsSkipping)
+            return CleanupPolicy.Finish;
+
+        return CleanupPolicy.Cancel;
     }
 }
