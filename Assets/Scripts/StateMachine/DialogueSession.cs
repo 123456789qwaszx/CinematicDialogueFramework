@@ -69,6 +69,10 @@ public sealed class DialogueSession
         }
 
         _gatePlanner.BuildForCurrentNode(_situation, _state);
+        
+        PresentAndPlayCurrentStep(
+            nodeIndex: _state.CurrentNodeIndex,
+            stepIndex: _state.StepGate.StepIndex);
     }
 
     public void Tick()

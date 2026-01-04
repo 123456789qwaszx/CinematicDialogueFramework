@@ -7,7 +7,7 @@ using UnityEngine;
 
 public abstract class CommandBase : ISequenceCommand
 {
-    public string DebugName => GetType().Name;
+    public virtual string DebugName => GetType().Name;
     // 스킵이면 그냥 안 해도 되는 단순 SFX, 장식 파티클, 작은 흔들림 등은 Ignore로 override
     // 대사 출력/로그/시그널 발행 같은 커맨드는 ExecuteEvenIfSkipping으로 override
     protected virtual SkipPolicy SkipPolicy => SkipPolicy.CompleteImmediately;
