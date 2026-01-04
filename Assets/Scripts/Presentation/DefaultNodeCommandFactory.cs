@@ -11,20 +11,20 @@ public sealed class DefaultNodeCommandFactory : INodeCommandFactory
         _cameraShake = cameraShakeService;
     }
     
-    public bool TryCreate(NodeCommandSpec spec, out ISequenceCommand command)
+    public bool TryCreate(CommandSpecBase spec, out ISequenceCommand command)
     {
         command = null;
         if (spec == null)
             return false;
 
-        switch (spec.kind)
+        switch (spec)
         {
-            case NodeCommandKind.ShowLine:
-                command = CreateShowLine(spec);
+            case DefaultShowLineCommandSpec show:
+                command = CreateShowLine(show);
                 return command != null;
 
-            case NodeCommandKind.ShakeCamera:
-                command = CreateShakeCamera(spec);
+            case DefaultShakeCameraCommandSpec shake:
+                command = CreateShakeCamera(shake);
                 return command != null;
 
             default:
@@ -33,7 +33,7 @@ public sealed class DefaultNodeCommandFactory : INodeCommandFactory
     }
     
     
-    private ISequenceCommand CreateShowLine(NodeCommandSpec spec)
+    private ISequenceCommand CreateShowLine(DefaultShowLineCommandSpec  spec)
     {
         if (spec.line == null || _dialoguePresentation == null)
             return null;
@@ -41,14 +41,14 @@ public sealed class DefaultNodeCommandFactory : INodeCommandFactory
         return new ShowLineCommand(_dialoguePresentation, spec.line, spec.screenId, spec.widgetId);
     }
 
-    private ISequenceCommand CreateShakeCamera(NodeCommandSpec spec)
+    private ISequenceCommand CreateShakeCamera(DefaultShakeCameraCommandSpec  spec)
     {
         if (_cameraShake == null)
             return null;
 
         return new ShakeCameraCommand(
             _cameraShake,
-            spec.shakeStrength,
-            spec.shakeDuration);
+            spec.strength,
+            spec.duration);
     }
 }

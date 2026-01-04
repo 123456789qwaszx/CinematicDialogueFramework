@@ -7,7 +7,7 @@ public sealed class NodeViewModelBuilder
         int nodeIndex = state.CurrentNodeIndex;
         int stepIndex = state.StepGate.StepIndex;
 
-        DialogueNodeSpec node = situation.nodes[nodeIndex];
+        NodeSpec node = situation.nodes[nodeIndex];
 
         DialogueLine line = GetPrimaryLine(node, stepIndex);
 
@@ -25,12 +25,12 @@ public sealed class NodeViewModelBuilder
         );
     }
 
-    private DialogueLine GetPrimaryLine(DialogueNodeSpec node, int stepIndex)
+    private DialogueLine GetPrimaryLine(NodeSpec node, int stepIndex)
     {
         // 1) current step first
         if (node.steps != null && stepIndex >= 0 && stepIndex < node.steps.Count)
         {
-            List<NodeCommandSpec> commands = node.steps[stepIndex]?.commands;
+            List<CommandSpecBase> commands = node.steps[stepIndex]?.commands;
             DialogueLine line = FirstShowLine(commands);
             
             if (line != null)
@@ -42,7 +42,7 @@ public sealed class NodeViewModelBuilder
         {
             for (int step = 0; step < node.steps.Count; step++)
             {
-                List<NodeCommandSpec> commands = node.steps[step]?.commands;
+                List<CommandSpecBase> commands = node.steps[step]?.commands;
                 DialogueLine line = FirstShowLine(commands);
                 
                 if (line != null)
@@ -53,18 +53,18 @@ public sealed class NodeViewModelBuilder
         return null;
     }
 
-    private DialogueLine FirstShowLine(List<NodeCommandSpec> commands)
+    private DialogueLine FirstShowLine(List<CommandSpecBase> commands)
     {
-        if (commands == null)
+        if (commands == null || commands.Count == 0)
             return null;
 
         for (int i = 0; i < commands.Count; i++)
         {
-            NodeCommandSpec spec = commands[i];
-            if (spec != null && spec.kind == NodeCommandKind.ShowLine && spec.line != null)
-                return spec.line;
+            CommandSpecBase spec = commands[i];
+            if (spec is DefaultShowLineCommandSpec show && show.line != null)
+                return show.line;
         }
-        
+
         return null;
     }
 }

@@ -1,4 +1,4 @@
 public interface INodeCommandFactory
 {
-    bool TryCreate(NodeCommandSpec spec, out ISequenceCommand command);
+    bool TryCreate(CommandSpecBase spec, out ISequenceCommand command);
 }

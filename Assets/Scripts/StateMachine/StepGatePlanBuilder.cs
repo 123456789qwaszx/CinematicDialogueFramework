@@ -27,7 +27,7 @@ public class StepGatePlanBuilder
             return;
         }
 
-        DialogueNodeSpec node = situation.nodes[state.CurrentNodeIndex];
+        NodeSpec node = situation.nodes[state.CurrentNodeIndex];
 
         if (node == null || node.steps == null || node.steps.Count == 0)
         {
@@ -38,7 +38,7 @@ public class StepGatePlanBuilder
 
         for (int i = 0; i < node.steps.Count; i++)
         {
-            DialogueStepSpec step = node.steps[i];
+            StepSpec step = node.steps[i];
 
             // step 자체가 null이거나 gate가 default면 Input으로 보정
             GateToken token = (step == null) ? default : step.gate;

@@ -10,5 +10,5 @@ public class SituationSpecSO : ScriptableObject
     /// </summary>
     public string situationKey;
 
-    public List<DialogueNodeSpec> nodes = new();
+    public List<NodeSpec> nodes = new();
 }

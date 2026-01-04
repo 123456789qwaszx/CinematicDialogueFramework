@@ -34,7 +34,7 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
     private void OnDestroy() => Stop();
     
     
-    public void PlayStep(DialogueNodeSpec node, int stepIndex, NodePlayScope scope, DialogueLine fallbackLine = null)
+    public void PlayStep(NodeSpec node, int stepIndex, NodePlayScope scope, DialogueLine fallbackLine = null)
     {
         if (!_isInitialized)
             return;
@@ -47,10 +47,26 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         {
             if (fallbackLine != null)
             {
-                _commandFactory.TryCreate(
-                    new NodeCommandSpec { line = fallbackLine}, out ISequenceCommand fallbackCommand);
-                commands = new List<ISequenceCommand> { fallbackCommand };
+                var fallbackSpec = new DefaultShowLineCommandSpec
+                {
+                    line = fallbackLine,
+                    // 필요하면 node 쪽에서 기본 screenId / widgetId를 꺼내서 세팅
+                    // screenId = node.defaultScreenId,
+                    // widgetId = node.defaultWidgetId,
+                };
+
+                if (_commandFactory.TryCreate(fallbackSpec, out ISequenceCommand fallbackCommand)
+                    && fallbackCommand != null)
+                {
+                    commands = new List<ISequenceCommand> { fallbackCommand };
+                }
+                else
+                {
+                    Log("Failed to create fallback ShowLine command");
+                    return;
+                }
             }
+
             else
             {
                 Log($"Step skipped: stepIndex={stepIndex} (no commands)");
@@ -147,7 +163,7 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
     }
     
 
-    private List<ISequenceCommand> BuildCommandsFromStep(DialogueNodeSpec node, int stepIndex)
+    private List<ISequenceCommand> BuildCommandsFromStep(NodeSpec node, int stepIndex)
     {
         var list = new List<ISequenceCommand>();
 
@@ -162,18 +178,24 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
             return list;
         }
 
-        DialogueStepSpec step = node.steps[stepIndex];
+        StepSpec step = node.steps[stepIndex];
         if (step == null || step.commands == null || step.commands.Count == 0)
         {
             Log($"Step Empty (step={step})");
             return list;
         }
 
-        foreach (NodeCommandSpec spec in step.commands)
+        foreach (CommandSpecBase spec in step.commands)
         {
-            if (!_commandFactory.TryCreate(spec, out ISequenceCommand cmd))
+            if (spec == null)
             {
-                Log($"failed to create command (spec={spec})");
+                Log("Null command spec in step; skipped.");
+                continue;
+            }
+            
+            if (!_commandFactory.TryCreate(spec, out ISequenceCommand cmd) || cmd == null)
+            {
+                Log($"Failed to create command (specType={spec.GetType().Name})");
                 continue;
             }
             

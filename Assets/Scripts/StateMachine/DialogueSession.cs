@@ -160,7 +160,7 @@ public sealed class DialogueSession
         NodeViewModel viewModel = _vmBuilder.Build(_situation, _state);
         _output.Show(viewModel);
 
-        DialogueNodeSpec node = _situation.nodes[nodeIndex];
+        NodeSpec node = _situation.nodes[nodeIndex];
         _output.PlayStep(node, stepIndex, _nodeScope, fallbackLine : new DialogueLine());
     }
 
