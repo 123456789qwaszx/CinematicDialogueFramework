@@ -12,77 +12,64 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77efca1a7ac39ca499c3be8e21666640, type: 3}
   m_Name: SituationSpec 1
   m_EditorClassIdentifier: Dialogue.Shared::SituationSpecSO
-  situationKey: sit01
+  sequenceKey: sit01
   nodes:
-  - steps:
+  - name: 
+    steps:
     - commands:
-      - kind: 0
-        line:
-          speakerId: System
-          expression: 0
-          text: (write dialogue...)
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
-      - kind: 0
-        line:
-          speakerId: System
-          expression: 0
-          text: (write dialogue...)
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
+      - rid: -2
+      - rid: -2
       gate:
         type: 0
         seconds: 0
         signalKey: 
-  - steps:
+  - name: 
+    steps: []
+  - name: 
+    steps:
     - commands:
-      - kind: 1
-        line:
-          speakerId: System
-          expression: 0
-          text: (write dialogue...)
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
-      - kind: 0
-        line:
-          speakerId: System
-          expression: 0
-          text: (write dialogue...)
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
+      - rid: -2
+      - rid: -2
       gate:
         type: 0
         seconds: 0
         signalKey: 
-  - steps:
+  - name: 
+    steps:
     - commands:
-      - kind: 0
-        line:
-          speakerId: System
-          expression: 0
-          text: (write dialogue...)
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
+      - rid: -2
       gate:
         type: 0
         seconds: 0
         signalKey: 
-  - steps:
+  - name: 
+    steps:
     - commands:
-      - kind: 0
-        line:
-          speakerId: System
-          expression: 0
-          text: (write dialogue...)
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
+      - rid: -2
       gate:
         type: 0
         seconds: 0
         signalKey: 
+    - commands:
+      - rid: -2
+      gate:
+        type: 0
+        seconds: 0
+        signalKey: 
+    - commands:
+      - rid: -2
+      gate:
+        type: 0
+        seconds: 0
+        signalKey: 
+    - commands:
+      - rid: -2
+      gate:
+        type: 0
+        seconds: 0
+        signalKey: 
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }

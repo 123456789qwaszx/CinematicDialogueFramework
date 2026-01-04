@@ -13,5 +13,6 @@ public class StepSpec
 [System.Serializable]
 public class NodeSpec
 {
+    public string name;
     public List<StepSpec> steps = new();
 }

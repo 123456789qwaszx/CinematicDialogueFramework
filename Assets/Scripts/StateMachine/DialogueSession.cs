@@ -19,7 +19,7 @@ public sealed class DialogueSession
     private readonly NodePlayScope _nodeScope;
 
     // Runtime state
-    private SituationSpecSO _situation;
+    private SequenceSpecSO _situation;
     private DialogueRuntimeState _state;
 
 
@@ -143,7 +143,7 @@ public sealed class DialogueSession
         return new DialogueRuntimeState
         {
             RouteKey = routeKey,
-            SituationKey = route.SituationKey,
+            SituationKey = route.SequenceKey,
             BranchKey = "Default",
             VariantKey = "Default",
             CurrentNodeIndex = 0,

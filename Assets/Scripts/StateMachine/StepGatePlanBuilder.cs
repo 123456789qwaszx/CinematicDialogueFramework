@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class StepGatePlanBuilder
 {
-    public void BuildForCurrentNode(SituationSpecSO situation, DialogueRuntimeState state)
+    public void BuildForCurrentNode(SequenceSpecSO situation, DialogueRuntimeState state)
     {
         var gate = new StepGateState
         {

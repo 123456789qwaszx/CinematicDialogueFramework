@@ -18,8 +18,8 @@ public sealed class DialogueRepository : Singleton<DialogueRepository>
     [SerializeField] private string speakerResourcesPath  = "Dialogue/Speaker";
 
     // ===== Data lookup =====
-    private readonly Dictionary<string, DialogueSequenceData> _sequencesById 
-        = new Dictionary<string, DialogueSequenceData>(StringComparer.Ordinal);
+    private readonly Dictionary<string, SequenceDatabaseSO> _sequencesById 
+        = new Dictionary<string, SequenceDatabaseSO>(StringComparer.Ordinal);
 
     private readonly Dictionary<string, DialogueSpeakerData> _speakersById
         = new Dictionary<string, DialogueSpeakerData>(StringComparer.Ordinal);
@@ -56,10 +56,10 @@ public sealed class DialogueRepository : Singleton<DialogueRepository>
 
     private void LoadAllSequences()
     {
-        DialogueSequenceData[] allSequences =
-            Resources.LoadAll<DialogueSequenceData>(sequenceResourcesPath);
+        SequenceDatabaseSO[] allSequences =
+            Resources.LoadAll<SequenceDatabaseSO>(sequenceResourcesPath);
 
-        foreach (DialogueSequenceData seq in allSequences)
+        foreach (SequenceDatabaseSO seq in allSequences)
         {
             if (seq == null || string.IsNullOrEmpty(seq.sequenceId))
             {
@@ -124,20 +124,20 @@ public sealed class DialogueRepository : Singleton<DialogueRepository>
 
     #region Public API - Sequence / Situation
 
-    public bool TryGetSequence(string sequenceId, out DialogueSequenceData sequence)
+    public bool TryGetSequence(string sequenceId, out SequenceDatabaseSO sequence)
         => _sequencesById.TryGetValue(sequenceId, out sequence);
 
-    public bool TryGetSituation(string sequenceId, string situationId, out SituationSpecSO situation)
+    public bool TryGetSituation(string sequenceId, string situationId, out SequenceSpecSO situation)
     {
         situation = null;
-        if (!_sequencesById.TryGetValue(sequenceId, out DialogueSequenceData seq) || seq == null)
+        if (!_sequencesById.TryGetValue(sequenceId, out SequenceDatabaseSO seq) || seq == null)
             return false;
 
         if (seq.situations == null)
             return false;
 
         situation = seq.situations
-            .FirstOrDefault(s => s != null && s.situationKey == situationId);
+            .FirstOrDefault(s => s != null && s.sequenceKey == situationId);
         return situation != null;
     }
 

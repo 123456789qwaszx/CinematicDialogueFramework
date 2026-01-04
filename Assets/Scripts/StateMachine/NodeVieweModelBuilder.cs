@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 public sealed class NodeViewModelBuilder
 {
-    public NodeViewModel Build(SituationSpecSO situation, DialogueRuntimeState state)
+    public NodeViewModel Build(SequenceSpecSO situation, DialogueRuntimeState state)
     {
         int nodeIndex = state.CurrentNodeIndex;
         int stepIndex = state.StepGate.StepIndex;

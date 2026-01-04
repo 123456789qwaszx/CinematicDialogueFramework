@@ -2,15 +2,15 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "DialogueSequenceData", menuName = "Dialogue/Sequence")]
-public class DialogueSequenceData : ScriptableObject
+[CreateAssetMenu(fileName = "SequenceDataBase", menuName = "Dialogue/Sequence")]
+public class SequenceDatabaseSO : ScriptableObject
 {
     public string sequenceId;
 
     // ✅ 인라인 작성 대신, 작성된 SituationSpecSO를 참조
-    public List<SituationSpecSO> situations = new();
+    public List<SequenceSpecSO> situations = new();
 
-    private Dictionary<string, SituationSpecSO> _situationsDict;
+    private Dictionary<string, SequenceSpecSO> _situationsDict;
 
     private void OnEnable()
     {
@@ -26,18 +26,18 @@ public class DialogueSequenceData : ScriptableObject
 
     private void RebuildIndex()
     {
-        _situationsDict = new Dictionary<string, SituationSpecSO>(StringComparer.Ordinal);
+        _situationsDict = new Dictionary<string, SequenceSpecSO>(StringComparer.Ordinal);
 
         for (int i = 0; i < situations.Count; i++)
         {
-            SituationSpecSO situation = situations[i];
+            SequenceSpecSO situation = situations[i];
             if (situation == null)
                 continue;
             
-            if (string.IsNullOrWhiteSpace(situation.situationKey))
+            if (string.IsNullOrWhiteSpace(situation.sequenceKey))
                 continue;
             
-            string key = situation.situationKey;
+            string key = situation.sequenceKey;
             bool isNewKey = _situationsDict.TryAdd(key, situation);
             
             if (!isNewKey)
@@ -48,7 +48,7 @@ public class DialogueSequenceData : ScriptableObject
         }
     }
 
-    public bool TryGetSituation(string situationKey, out SituationSpecSO situation)
+    public bool TryGetSituation(string situationKey, out SequenceSpecSO situation)
     {
         situation = null;
 

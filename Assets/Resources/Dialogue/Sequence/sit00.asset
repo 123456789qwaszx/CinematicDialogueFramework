@@ -14,147 +14,249 @@ MonoBehaviour:
   m_EditorClassIdentifier: Dialogue.Shared::SituationSpecSO
   situationKey: sit00
   nodes:
-  - steps:
+  - name: Fiter
+    steps:
     - commands:
-      - kind: 0
-        line:
-          speakerId: qwe
-          expression: 0
-          text: qwe0
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
-      - kind: 0
-        line:
-          speakerId: qwe
-          expression: 0
-          text: qwe0
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
+      - rid: 2406591361036058699
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 
+    - commands: []
       gate:
         type: 1
         seconds: 0
         signalKey: 
     - commands:
-      - kind: 0
-        line:
-          speakerId: qwe
-          expression: 0
-          text: qwe1
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
+      - rid: 2406591361036058716
+      - rid: 2406591361036058717
+      - rid: 2406591361036058718
+      - rid: 2406591361036058719
+      - rid: 2406591361036058720
+      - rid: 2406591361036058721
       gate:
         type: 1
         seconds: 0
         signalKey: 
     - commands:
-      - kind: 0
-        line:
-          speakerId: qwer
-          expression: 0
-          text: qwe2
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
+      - rid: 2406591361036058716
+      - rid: 2406591361036058717
+      - rid: 2406591361036058718
+      - rid: 2406591361036058719
+      - rid: 2406591361036058720
+      - rid: 2406591361036058721
       gate:
         type: 1
         seconds: 0
         signalKey: 
-  - steps:
+  - name: tewrwet
+    steps:
     - commands:
-      - kind: 0
-        line:
-          speakerId: Node2
-          expression: 0
-          text: NextNode1
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
-      - kind: 0
-        line:
-          speakerId: qwe
-          expression: 0
-          text: qwe0
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
+      - rid: -2
+      - rid: -2
+      - rid: 2406591361036058689
+      - rid: 2406591361036058690
       gate:
         type: 1
         seconds: 0
         signalKey: 
     - commands:
-      - kind: 0
-        line:
-          speakerId: Node2
-          expression: 0
-          text: Step2
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
+      - rid: -2
       gate:
         type: 1
         seconds: 0
         signalKey: 
     - commands:
-      - kind: 0
-        line:
-          speakerId: Node2
-          expression: 0
-          text: step3
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
-      gate:
-        type: 1
-        seconds: 0
-        signalKey: 
-  - steps:
-    - commands:
-      - kind: 0
-        line:
-          speakerId: Node3
-          expression: 0
-          text: step1
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
-      - kind: 0
-        line:
-          speakerId: qwe
-          expression: 0
-          text: qwe0
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
+      - rid: -2
+      - rid: 2406591361036058688
       gate:
         type: 1
         seconds: 0
         signalKey: 
     - commands:
-      - kind: 0
-        line:
-          speakerId: Node3
-          expression: 0
-          text: Step2
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
+      - rid: -2
+      - rid: 2406591361036058688
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 
+  - name: 1234qwer
+    steps:
+    - commands: []
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 
+    - commands: []
       gate:
         type: 1
         seconds: 0
         signalKey: 
     - commands:
-      - kind: 0
-        line:
-          speakerId: Node3
-          expression: 0
-          text: step3
-          position: 0
-        shakeStrength: 0
-        shakeDuration: 0
+      - rid: -2
       gate:
         type: 1
         seconds: 0
         signalKey: 
+    - commands:
+      - rid: -2
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 
+  - name: twerwer
+    steps:
+    - commands:
+      - rid: 2406591361036058724
+      - rid: 2406591361036058725
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 
+    - commands:
+      - rid: 2406591361036058692
+      - rid: 2406591361036058696
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 
+    - commands:
+      - rid: 2406591361036058704
+      gate:
+        type: 0
+        seconds: 0
+        signalKey: 
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 2406591361036058688
+      type: {class: DefaultShowLineCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetId: 
+        line:
+          speakerId: 
+          expression: 0
+          text: 
+          position: 0
+    - rid: 2406591361036058689
+      type: {class: DefaultShowLineCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetId: 
+        line:
+          speakerId: 
+          expression: 0
+          text: 
+          position: 0
+    - rid: 2406591361036058690
+      type: {class: DefaultShowLineCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetId: 
+        line:
+          speakerId: 
+          expression: 0
+          text: 
+          position: 0
+    - rid: 2406591361036058692
+      type: {class: DefaultShowLineCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetId: 
+        line:
+          speakerId: 
+          expression: 0
+          text: 
+          position: 0
+    - rid: 2406591361036058696
+      type: {class: DefaultShowLineCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetId: 
+        line:
+          speakerId: 
+          expression: 0
+          text: 
+          position: 0
+    - rid: 2406591361036058699
+      type: {class: DefaultShakeCameraCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetId: 
+        strength: 1
+        duration: 0.2
+    - rid: 2406591361036058704
+      type: {class: DefaultShakeCameraCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetId: 
+        strength: 1
+        duration: 0.2
+    - rid: 2406591361036058716
+      type: {class: DefaultShowLineCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetId: 
+        line:
+          speakerId: 
+          expression: 0
+          text: 
+          position: 0
+    - rid: 2406591361036058717
+      type: {class: DefaultShakeCameraCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetId: 
+        strength: 1
+        duration: 0.2
+    - rid: 2406591361036058718
+      type: {class: DefaultShowLineCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetId: 
+        line:
+          speakerId: 
+          expression: 0
+          text: 
+          position: 0
+    - rid: 2406591361036058719
+      type: {class: DefaultShakeCameraCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetId: 
+        strength: 1
+        duration: 0.2
+    - rid: 2406591361036058720
+      type: {class: DefaultShowLineCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetId: 
+        line:
+          speakerId: 
+          expression: 0
+          text: 
+          position: 0
+    - rid: 2406591361036058721
+      type: {class: DefaultShakeCameraCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetId: 
+        strength: 1
+        duration: 0.2
+    - rid: 2406591361036058724
+      type: {class: DefaultShakeCameraCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetId: 
+        strength: 1
+        duration: 0.2
+    - rid: 2406591361036058725
+      type: {class: DefaultShakeCameraCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetId: 
+        strength: 1
+        duration: 0.2

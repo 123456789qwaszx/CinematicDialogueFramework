@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 // Inspector-serialized entry (authoring data)
 [Serializable]
@@ -9,27 +10,27 @@ public class DialogueRouteEntry
     [Header("Route ID (read-only at runtime)")]
     public string routeKey;
 
-    [Header("Data")]
-    public DialogueSequenceData sequenceData;
-    public string situationKey;
+    [FormerlySerializedAs("sequenceData")] [Header("Data")]
+    public SequenceDatabaseSO sequenceDatabase;
+    [FormerlySerializedAs("se")] [FormerlySerializedAs("situationKey")] public string sequenceKey;
 }
 
 // Immutable runtime snapshot
 public readonly struct DialogueRoute
 {
     public readonly string RouteKey;
-    public readonly DialogueSequenceData Sequence;
+    public readonly SequenceDatabaseSO Sequence;
     /// <summary>
     /// Situation key to start from within the selected sequence.
     /// Must match (SituationSpec).situationKey.
     /// </summary>
-    public readonly string SituationKey;
+    public readonly string SequenceKey;
 
     public DialogueRoute(DialogueRouteEntry entry)
     {
         RouteKey     = entry.routeKey;
-        Sequence     = entry.sequenceData;
-        SituationKey  = entry.situationKey;
+        Sequence     = entry.sequenceDatabase;
+        SequenceKey  = entry.sequenceKey;
     }
 }
 
