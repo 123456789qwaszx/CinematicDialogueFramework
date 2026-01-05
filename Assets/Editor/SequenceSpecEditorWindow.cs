@@ -293,6 +293,18 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     {
         EditorGUILayout.LabelField($"Step {_selectedStep}", EditorStyles.boldLabel);
 
+        // ✅ Step Name
+        var stepNameProp = stepProp.FindPropertyRelative("editorName");
+        if (stepNameProp != null)
+        {
+            EditorGUI.BeginChangeCheck();
+            string newName = EditorGUILayout.TextField("Name", stepNameProp.stringValue ?? "");
+            if (EditorGUI.EndChangeCheck())
+                stepNameProp.stringValue = newName;
+        }
+
+        EditorGUILayout.Space(6);
+        
         // Gate
         var gateProp = stepProp.FindPropertyRelative("gate");
         if (gateProp != null)
@@ -443,7 +455,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                 stepCount = stepsProp.arraySize;
 
             // name prop (DialogueNodeSpec.name)
-            var nameProp = nodeProp.FindPropertyRelative("name");
+            var nameProp = nodeProp.FindPropertyRelative("editorName");
 
             // 검색 hit 체크 (기존 기능 유지)
             bool hit = true;
@@ -506,27 +518,17 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
                         DelayModify("Add Node", so =>
                         {
-                            var nodes = so.FindProperty(nodesPath);
-                            if (nodes == null || !nodes.isArray) return;
+                            var seq = (SequenceSpecSO)so.targetObject;
+                            if (seq == null) return;
 
-                            insertAt = Mathf.Clamp(insertAt, 0, nodes.arraySize); // arraySize도 허용(맨끝)
+                            seq.nodes ??= new List<NodeSpec>();
 
-                            // ✅ Insert (주의: 기본적으로 "복제"가 됨)
-                            nodes.InsertArrayElementAtIndex(insertAt);
+                            insertAt = Mathf.Clamp(insertAt, 0, seq.nodes.Count);
+                            seq.nodes.Insert(insertAt, CreateBlankNode()); // ✅ blank
 
-                            // ✅ 새 노드 초기화(복제 흔적 제거)
-                            var newNode = nodes.GetArrayElementAtIndex(insertAt);
-                            var nameProp = newNode.FindPropertyRelative("name");
-                            if (nameProp != null) nameProp.stringValue = "";
-
-                            var steps = newNode.FindPropertyRelative("steps");
-                            if (steps != null && steps.isArray)
-                                steps.arraySize = 0;
-
-                            // 선택 이동
                             _selectedNode = insertAt;
                             _selectedStep = -1;
-
+                            _nodesList = null;
                             _stepsList = null;
                             _commandsList = null;
                         });
@@ -534,17 +536,23 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
                     menu.AddItem(new GUIContent("Duplicate Node"), false, () =>
                     {
+                        int srcIndex = index;
+                        int insertAt = index + 1;
+
                         DelayModify("Duplicate Node", so =>
                         {
-                            var nodes = so.FindProperty(nodesPath);
-                            if (nodes == null || !nodes.isArray) return;
-                            if (index < 0 || index >= nodes.arraySize) return;
+                            var seq = (SequenceSpecSO)so.targetObject;
+                            if (seq == null) return;
 
-                            nodes.InsertArrayElementAtIndex(index);
+                            seq.nodes ??= new List<NodeSpec>();
+                            if (srcIndex < 0 || srcIndex >= seq.nodes.Count) return;
 
-                            _selectedNode = index;
+                            insertAt = Mathf.Clamp(insertAt, 0, seq.nodes.Count);
+                            seq.nodes.Insert(insertAt, CloneNodeDeep(seq.nodes[srcIndex])); // ✅ deep
+
+                            _selectedNode = insertAt;
                             _selectedStep = -1;
-
+                            _nodesList = null;
                             _stepsList = null;
                             _commandsList = null;
                         });
@@ -649,8 +657,14 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             const float leftPad = 2f; // 24 -> 16 (더 촘촘)
             var contentRect = new Rect(rect.x + leftPad, rect.y, rect.width - leftPad, rect.height);
 
+            var nameProp = stepProp.FindPropertyRelative("editorName");
+            string stepName = (nameProp != null) ? (nameProp.stringValue ?? "") : "";
+            stepName = stepName.Trim();
 
-            EditorGUI.LabelField(contentRect, $"Step {index} | gate={gateSummary} | ({cmdCount}) ");
+            string title = string.IsNullOrEmpty(stepName) ? $"Step {index}" : stepName;
+
+            EditorGUI.LabelField(contentRect, $"{title} | gate={gateSummary} | ({cmdCount})");
+            //EditorGUI.LabelField(contentRect, $"Step {index} | gate={gateSummary} | ({cmdCount}) ");
 
             // ✅ Step 우클릭 메뉴 (이 element rect에서 직접 처리)
             if (e.type == EventType.MouseDown && e.button == 1 && rect.Contains(e.mousePosition))
@@ -665,78 +679,59 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                 ShowContextMenu(menu =>
                 {
                     // -------------------------
-                    // 1) 빈 Step 추가(기존 기능 유지)
-                    // -------------------------
-                    menu.AddItem(new GUIContent("Add Step (Below)"), false, () =>
-                    {
-                        int insertAt = index + 1;
-                        string stepsPath = stepsProp.propertyPath;
-
-                        DelayModify("Add Step", so =>
-                        {
-                            var steps = so.FindProperty(stepsPath);
-                            if (steps == null || !steps.isArray) return;
-
-                            insertAt = Mathf.Clamp(insertAt, 0, steps.arraySize);
-
-                            // Insert는 기본적으로 복제가 되므로, "빈 Step" 만들려면 reset 필요
-                            steps.InsertArrayElementAtIndex(insertAt);
-
-                            var newStep = steps.GetArrayElementAtIndex(insertAt);
-
-                            // ✅ gate reset (가능한 경우만)
-#if UNITY_2021_2_OR_NEWER
-                            var gate = newStep.FindPropertyRelative("gate");
-                            if (gate != null)
-                            {
-                                try
-                                {
-                                    var v = gate.boxedValue;
-                                    if (v != null)
-                                        gate.boxedValue = Activator.CreateInstance(v.GetType());
-                                }
-                                catch
-                                {
-                                    /* ignore */
-                                }
-                            }
-#endif
-
-                            // ✅ commands empty
-                            var cmds = newStep.FindPropertyRelative("commands");
-                            if (cmds != null && cmds.isArray)
-                                cmds.arraySize = 0;
-
-                            _selectedStep = insertAt;
-                            _stepsList = null;
-                            _commandsList = null;
-                        });
-                    });
-
-                    // -------------------------
                     // 2) ✅ 복사 Step 추가 (NEW)
                     // -------------------------
                     menu.AddItem(new GUIContent("Duplicate Step (Below)"), false, () =>
                     {
-                        int insertAt = index + 1;
-                        string stepsPath = stepsProp.propertyPath;
+                        int nodeIndex = _selectedNode;
+                        int srcIndex  = index;
+                        int insertAt  = index + 1;
 
                         DelayModify("Duplicate Step", so =>
                         {
-                            var steps = so.FindProperty(stepsPath);
-                            if (steps == null || !steps.isArray) return;
+                            var seq = (SequenceSpecSO)so.targetObject;
+                            if (seq == null) return;
+                            if (nodeIndex < 0 || nodeIndex >= seq.nodes.Count) return;
 
-                            insertAt = Mathf.Clamp(insertAt, 0, steps.arraySize);
+                            var node = seq.nodes[nodeIndex];
+                            node.steps ??= new List<StepSpec>();
 
-                            // ✅ InsertArrayElementAtIndex = 기존 Step 복제
-                            steps.InsertArrayElementAtIndex(insertAt);
+                            if (srcIndex < 0 || srcIndex >= node.steps.Count) return;
 
-                            // 선택 이동
+                            insertAt = Mathf.Clamp(insertAt, 0, node.steps.Count);
+                            node.steps.Insert(insertAt, CloneStepDeep(node.steps[srcIndex]));  // ✅ deep copy
+
                             _selectedStep = insertAt;
                             _stepsList = null;
                             _commandsList = null;
                         });
                     });
+                    // -------------------------
+                    // 1) 빈 Step 추가(기존 기능 유지)
+                    // -------------------------
+                    menu.AddItem(new GUIContent("Add Step (Empty)"), false, () =>
+                    {
+                        int nodeIndex = _selectedNode;
+                        int insertAt = index + 1;
+
+                        DelayModify("Add Step", so =>
+                        {
+                            var seq = (SequenceSpecSO)so.targetObject;
+                            if (seq == null) return;
+                            if (nodeIndex < 0 || nodeIndex >= seq.nodes.Count) return;
+
+                            var node = seq.nodes[nodeIndex];
+                            node.steps ??= new List<StepSpec>();
+
+                            insertAt = Mathf.Clamp(insertAt, 0, node.steps.Count);
+                            node.steps.Insert(insertAt, CreateBlankStep());   // ✅ new list 보장
+
+                            _selectedStep = insertAt;
+                            _stepsList = null;
+                            _commandsList = null;
+                        });
+                    });
+
 
                     menu.AddSeparator("");
 
@@ -973,15 +968,36 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     // ------------------------------
     private void AddStep(SerializedProperty stepsProp)
     {
-        if (stepsProp == null || !stepsProp.isArray) return;
+        int nodeIndex = _selectedNode;
+        int srcStepIndex = _selectedStep;
 
-        Undo.RecordObject(targetSequence, "Add Step");
-        stepsProp.arraySize++;
-        _selectedStep = stepsProp.arraySize - 1;
+        DelayModify("Add Step", so =>
+        {
+            var seq = (SequenceSpecSO)so.targetObject;
+            if (seq == null) return;
+            if (nodeIndex < 0 || nodeIndex >= seq.nodes.Count) return;
 
-        EditorUtility.SetDirty(targetSequence);
-        _stepsList = null;
-        _commandsList = null;
+            var node = seq.nodes[nodeIndex];
+            node.steps ??= new List<StepSpec>();
+
+            // ✅ 항상 맨 아래에 추가
+            int insertAt = node.steps.Count;
+
+            // ✅ 선택된 Step을 기준으로 Deep Clone (없으면 blank)
+            StepSpec newStep;
+            if (srcStepIndex >= 0 && srcStepIndex < node.steps.Count)
+                newStep = CloneStepDeep(node.steps[srcStepIndex]);
+            else
+                newStep = CreateBlankStep();
+
+            node.steps.Insert(insertAt, newStep);
+
+            // ✅ 새로 만든 Step을 선택 상태로
+            _selectedStep = insertAt;
+
+            _stepsList = null;
+            _commandsList = null;
+        });
     }
 
 
@@ -1272,7 +1288,76 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         if (_autoExpandedOnce.Add(key))
             prop.isExpanded = true; // ✅ 처음 본 순간에만 펼침
     }
+#if UNITY_EDITOR
+    private static StepSpec CreateBlankStep()
+    {
+        return new StepSpec
+        {
+            gate = default,
+            commands = new List<CommandSpecBase>()
+        };
+    }
+    private static NodeSpec CreateBlankNode()
+    {
+        return new NodeSpec
+        {
+            editorName = "",
+            steps = new List<StepSpec>()
+        };
+    }
 
+    private static NodeSpec CloneNodeDeep(NodeSpec src)
+    {
+        if (src == null) return CreateBlankNode();
+
+        var dst = new NodeSpec
+        {
+            editorName = src.editorName,
+            steps = new List<StepSpec>()
+        };
+
+        if (src.steps != null)
+        {
+            foreach (var s in src.steps)
+                dst.steps.Add(CloneStepDeep(s)); // ✅ Step까지 deep
+        }
+
+        return dst;
+    }
+
+    private static StepSpec CloneStepDeep(StepSpec src)
+    {
+        if (src == null) return CreateBlankStep();
+
+        var dst = new StepSpec
+        {
+            gate = src.gate, // struct 이면 값 복사 OK
+            commands = new List<CommandSpecBase>()
+        };
+
+        if (src.commands != null)
+        {
+            foreach (var c in src.commands)
+                dst.commands.Add(CloneCommandDeep(c));
+        }
+
+        return dst;
+    }
+
+    private static CommandSpecBase CloneCommandDeep(CommandSpecBase src)
+    {
+        if (src == null) return null;
+
+        var t = src.GetType();
+        var clone = (CommandSpecBase)Activator.CreateInstance(t);
+
+        // ✅ EditorJsonUtility는 SerializeReference(폴리모픽) 복사에 유리
+        string json = EditorJsonUtility.ToJson(src);
+        EditorJsonUtility.FromJsonOverwrite(json, clone);
+
+        return clone;
+    }
+#endif
 
     // ------------------------------
     // Misc helpers
