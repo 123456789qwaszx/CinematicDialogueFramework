@@ -41,9 +41,9 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     private string _commandsPropPath;
 
     private int _pendingCommandIndex = -1; // +Command 후 선택 유지용(선택사항이지만 같이 넣자)
-    
+
     private readonly HashSet<string> _autoExpandedOnce = new();
-    
+
     private float _nodesW;
     private float _stepsW;
 
@@ -114,7 +114,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     {
         _nodesW = Mathf.Clamp(position.width * 0.25f, 190f, 240f);
         _stepsW = Mathf.Clamp(position.width * 0.28f, 220f, 270f);
-        
+
         DrawToolbar();
         // 드래그 도중 다른 영역에서 mouse up 되어도 확실히 해제
         if (Event.current.type == EventType.MouseUp)
@@ -210,6 +210,9 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
     private void DrawRightPanel()
     {
+        if (_nodesList != null && _nodesList.index != _selectedNode)
+            _selectedNode = _nodesList.index;
+
         using (new EditorGUILayout.VerticalScope())
         {
             if (_nodesProp == null || _nodesProp.arraySize == 0)
@@ -239,7 +242,6 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
     private void DrawNodeEditor(SerializedProperty nodeProp, SerializedProperty stepsProp)
     {
-
         EditorGUILayout.Space(6);
 
         using (new EditorGUILayout.HorizontalScope())
@@ -330,7 +332,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                 MessageType.Error);
             return;
         }
-        
+
         commandsProp.isExpanded = true;
         // ✅ Commands 리스트 먼저
         EnsureCommandsList(stepProp, commandsProp);
@@ -344,7 +346,9 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
             GUILayout.FlexibleSpace();
 
-            using (new EditorGUI.DisabledScope(commandsProp.arraySize == 0 || _commandsList == null || _commandsList.index < 0 || _commandsList.index >= commandsProp.arraySize))
+            using (new EditorGUI.DisabledScope(commandsProp.arraySize == 0 || _commandsList == null ||
+                                               _commandsList.index < 0 ||
+                                               _commandsList.index >= commandsProp.arraySize))
             {
                 if (GUILayout.Button("Delete Command", GUILayout.Width(110), GUILayout.Height(24)))
                     DeleteSelectedCommand(commandsProp); // (원하면 확인도 추가 가능)
@@ -371,8 +375,9 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             _selectedStep = -1;
             return;
         }
+
         _autoExpandedOnce.Clear();
-        
+
         // ✅ 이전 선택값 백업
         int prevNode = _selectedNode;
         int prevStep = _selectedStep;
@@ -400,7 +405,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         }
 
         BuildNodesList();
-
+        SyncNodeSelectionToList();
         // 리스트들은 재생성하도록 null
         _stepsList = null;
         _commandsList = null;
@@ -425,7 +430,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             _commandsList = null;
             Repaint();
         };
-        
+
         _nodesList.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Nodes");
 
         _nodesList.drawElementCallback = (rect, index, isActive, isFocused) =>
@@ -600,9 +605,9 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             displayHeader: true,
             displayAddButton: false,
             displayRemoveButton: false);
-        
+
         _stepsList.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Steps");
-        
+
         _stepsList.onSelectCallback = list =>
         {
             _selectedStep = list.index;
@@ -645,8 +650,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             const float leftPad = 2f; // 24 -> 16 (더 촘촘)
             var contentRect = new Rect(rect.x + leftPad, rect.y, rect.width - leftPad, rect.height);
 
-            
-            
+
             EditorGUI.LabelField(contentRect, $"Step {index} | gate={gateSummary} | ({cmdCount}) ");
 
             // ✅ Step 우클릭 메뉴 (이 element rect에서 직접 처리)
@@ -661,7 +665,10 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
                 ShowContextMenu(menu =>
                 {
-                    menu.AddItem(new GUIContent("+ Step (Below)"), false, () =>
+                    // -------------------------
+                    // 1) 빈 Step 추가(기존 기능 유지)
+                    // -------------------------
+                    menu.AddItem(new GUIContent("Add Step (Below)"), false, () =>
                     {
                         int insertAt = index + 1;
                         string stepsPath = stepsProp.propertyPath;
@@ -671,22 +678,62 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                             var steps = so.FindProperty(stepsPath);
                             if (steps == null || !steps.isArray) return;
 
-                            insertAt = Mathf.Clamp(insertAt, 0, steps.arraySize); // arraySize도 허용
+                            insertAt = Mathf.Clamp(insertAt, 0, steps.arraySize);
 
-                            // ✅ Insert (기본은 복제)
+                            // Insert는 기본적으로 복제가 되므로, "빈 Step" 만들려면 reset 필요
                             steps.InsertArrayElementAtIndex(insertAt);
 
-                            // ✅ 새 Step 초기화(복제 흔적 제거)
                             var newStep = steps.GetArrayElementAtIndex(insertAt);
 
-                            // gate는 struct default로 두는 편이 무난(너 런타임이 default->Input 보정)
-                            // commands는 빈 리스트로
+                            // ✅ gate reset (가능한 경우만)
+#if UNITY_2021_2_OR_NEWER
+                            var gate = newStep.FindPropertyRelative("gate");
+                            if (gate != null)
+                            {
+                                try
+                                {
+                                    var v = gate.boxedValue;
+                                    if (v != null)
+                                        gate.boxedValue = Activator.CreateInstance(v.GetType());
+                                }
+                                catch
+                                {
+                                    /* ignore */
+                                }
+                            }
+#endif
+
+                            // ✅ commands empty
                             var cmds = newStep.FindPropertyRelative("commands");
                             if (cmds != null && cmds.isArray)
                                 cmds.arraySize = 0;
 
                             _selectedStep = insertAt;
+                            _stepsList = null;
+                            _commandsList = null;
+                        });
+                    });
 
+                    // -------------------------
+                    // 2) ✅ 복사 Step 추가 (NEW)
+                    // -------------------------
+                    menu.AddItem(new GUIContent("Duplicate Step (Below)"), false, () =>
+                    {
+                        int insertAt = index + 1;
+                        string stepsPath = stepsProp.propertyPath;
+
+                        DelayModify("Duplicate Step", so =>
+                        {
+                            var steps = so.FindProperty(stepsPath);
+                            if (steps == null || !steps.isArray) return;
+
+                            insertAt = Mathf.Clamp(insertAt, 0, steps.arraySize);
+
+                            // ✅ InsertArrayElementAtIndex = 기존 Step 복제
+                            steps.InsertArrayElementAtIndex(insertAt);
+
+                            // 선택 이동
+                            _selectedStep = insertAt;
                             _stepsList = null;
                             _commandsList = null;
                         });
@@ -699,10 +746,11 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                         if (!EditorUtility.DisplayDialog("Delete Step", $"Delete Step {index}?", "Delete", "Cancel"))
                             return;
 
+                        string stepsPath = stepsProp.propertyPath;
+
                         DeleteArrayElementByPath("Delete Step", stepsPath, index, after: () =>
                         {
                             _selectedStep = Mathf.Clamp(_selectedStep, 0, stepsProp.arraySize - 2);
-
                             _stepsList = null;
                             _commandsList = null;
                         });
@@ -757,14 +805,11 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                 return EditorGUIUtility.singleLineHeight;
 
             var element = commandsProp.GetArrayElementAtIndex(index);
-            
+
             float h = EditorGUI.GetPropertyHeight(element, includeChildren: true);
             return h + 6f;
         };
-        _commandsList.drawHeaderCallback = rect =>
-        {
-            EditorGUI.LabelField(rect, "Commands", EditorStyles.boldLabel);
-        };
+        _commandsList.drawHeaderCallback = rect => { EditorGUI.LabelField(rect, "Commands", EditorStyles.boldLabel); };
 
         _commandsList.drawElementCallback = (rect, index, isActive, isFocused) =>
         {
@@ -816,7 +861,8 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
                     menu.AddItem(new GUIContent("Delete Command"), false, () =>
                     {
-                        if (!EditorUtility.DisplayDialog("Delete Command", $"Delete Command {index}?", "Delete", "Cancel"))
+                        if (!EditorUtility.DisplayDialog("Delete Command", $"Delete Command {index}?", "Delete",
+                                "Cancel"))
                             return;
 
                         DeleteArrayElementByPath("Delete Command", commandsPath, index, after: () =>
@@ -871,13 +917,36 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         if (_nodesProp == null) return;
 
         Undo.RecordObject(targetSequence, "Add Node");
+
+        int idx = _nodesProp.arraySize;
         _nodesProp.arraySize++;
-        _selectedNode = _nodesProp.arraySize - 1;
+
+        // ✅ 새로 생긴 노드를 강제로 초기화 (복사 방지)
+        var newNode = _nodesProp.GetArrayElementAtIndex(idx);
+
+        var nameProp = newNode.FindPropertyRelative("name");
+        if (nameProp != null) nameProp.stringValue = "";
+
+        var stepsProp = newNode.FindPropertyRelative("steps");
+        if (stepsProp != null && stepsProp.isArray)
+            stepsProp.arraySize = 0;
+
+        _selectedNode = idx;
         _selectedStep = -1;
 
         EditorUtility.SetDirty(targetSequence);
         _stepsList = null;
         _commandsList = null;
+
+        _selectedNode = idx;
+        _selectedStep = -1;
+
+        if (_nodesList != null) _nodesList.index = _selectedNode;
+
+        EditorUtility.SetDirty(targetSequence);
+        _stepsList = null;
+        _commandsList = null;
+        Repaint();
     }
 
     private void DeleteSelectedNode()
@@ -1131,44 +1200,28 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         return s.Length <= max ? s : s.Substring(0, max) + "…";
     }
 
-    private void ShowAddCommandTypeMenu(SerializedProperty commandsProp)
+    private void SyncNodeSelectionToList()
     {
-        if (commandsProp == null || !commandsProp.isArray) return;
-        if (!IsSerializeReferenceCommandList(commandsProp)) return;
+        if (_nodesList == null) return;
 
-        CacheCommandTypes();
-
-        string propPath = commandsProp.propertyPath;
-
-        ShowContextMenu(menu =>
+        int count = _nodesProp?.arraySize ?? 0;
+        if (count <= 0)
         {
-            if (_cachedCommandTypes == null || _cachedCommandTypes.Count == 0)
-            {
-                menu.AddDisabledItem(new GUIContent("No command types found (NodeCommandSpecBase derived)"));
-                return;
-            }
+            _nodesList.index = -1;
+            return;
+        }
 
-            foreach (var t in _cachedCommandTypes)
-            {
-                // 원하면 여기서 카테고리 경로를 만들 수 있음
-                menu.AddItem(new GUIContent($"+ Command/{t.Name}"), false, () =>
-                {
-                    DelayModify("Add Command", so =>
-                    {
-                        var fresh = so.FindProperty(propPath);
-                        if (fresh == null || !fresh.isArray) return;
+        _selectedNode = Mathf.Clamp(_selectedNode, 0, count - 1);
+        _nodesList.index = _selectedNode;
+    }
 
-                        int idx = fresh.arraySize;
-                        fresh.arraySize++;
+    private void SyncStepSelectionToList(SerializedProperty stepsProp)
+    {
+        if (_stepsList == null || stepsProp == null || !stepsProp.isArray) return;
 
-                        var element = fresh.GetArrayElementAtIndex(idx);
-                        element.managedReferenceValue = Activator.CreateInstance(t);
-
-                        _pendingCommandIndex = idx;
-                    });
-                });
-            }
-        });
+        int count = stepsProp.arraySize;
+        _selectedStep = (count <= 0) ? -1 : Mathf.Clamp(_selectedStep, 0, count - 1);
+        _stepsList.index = _selectedStep;
     }
 
     private void ShowContextMenu(Action<GenericMenu> build)
@@ -1209,7 +1262,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             after?.Invoke();
         });
     }
-    
+
     private void AutoExpandOnce(SerializedProperty prop)
     {
         if (prop == null) return;
