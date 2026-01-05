@@ -163,6 +163,5 @@ public sealed class DialogueSession
         NodeSpec node = _situation.nodes[nodeIndex];
         _output.PlayStep(node, stepIndex, _nodeScope, fallbackLine : new DialogueLine());
     }
-
     #endregion
 }

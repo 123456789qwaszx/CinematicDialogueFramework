@@ -30,8 +30,8 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         _isInitialized = true;
     }
 
-    private void OnDisable() => Stop();
-    private void OnDestroy() => Stop();
+    private void OnDisable() => Stop(CleanupPolicy.Cancel);
+    private void OnDestroy() => Stop(CleanupPolicy.Cancel);
     
     
     public void PlayStep(NodeSpec node, int stepIndex, CommandRunScope scope, DialogueLine fallbackLine = null)
@@ -108,9 +108,6 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         {
             if (runId == _runId && scope != null)
             {
-                CleanupPolicy policy = DecideCleanupPolicy(scope);
-                scope.Cleanup(policy);
-                
                 scope.SetNodeBusy(false);
                 scope.Token = CancellationToken.None;
 
@@ -119,12 +116,18 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
 
                 _mainRoutine = null;
 
-                Log($"Node End (runId={runId}, cleanup={policy})");
+                Log($"Node End (runId={runId})");
             }
         }
     }
-    
+
     public void Stop()
+    {
+        CleanupPolicy policy = DecideCleanupPolicy(_activeScope);
+        Stop(policy);
+    }
+
+    public void Stop(CleanupPolicy policy)
     {
         if (_isStopInProgress)
             return;
@@ -147,14 +150,13 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
 
             if (_activeScope != null)
             {
-                _activeScope.Cleanup(CleanupPolicy.Cancel);
-                
+                _activeScope.Cleanup(policy);
                 _activeScope.SetNodeBusy(false);
                 _activeScope.Token = CancellationToken.None;
                 _activeScope = null;
             }
 
-            Log("Stop() called");
+            Log($"Stop(policy={policy})");
         }
         finally
         {
@@ -237,10 +239,6 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
     private static CleanupPolicy DecideCleanupPolicy(CommandRunScope scope)
     {
         if (scope == null)
-            return CleanupPolicy.Cancel;
-
-        // Stop/Cancel이 Skip보다 강함
-        if (scope.Token.IsCancellationRequested)
             return CleanupPolicy.Cancel;
 
         // Skip은 "즉시 완료 상태"
