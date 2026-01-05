@@ -150,7 +150,7 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
 
             if (_activeScope != null)
             {
-                _activeScope.Cleanup(policy);
+                _activeScope.CleanupStep(policy);
                 _activeScope.SetNodeBusy(false);
                 _activeScope.Token = CancellationToken.None;
                 _activeScope = null;

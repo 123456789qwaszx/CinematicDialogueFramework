@@ -97,7 +97,7 @@ public sealed class SequencePlayer
                 _activeBackgroundRoutines.Add(routine);
                 
                 // run(scope)에 귀속: Stop/Skip 시 끊을 수 있게 등록
-                scope.Track(
+                scope.TrackStep(
                     cancel: () => { if (routine != null) _host.StopCoroutine(routine); },
                     finish: () => { if (routine != null) _host.StopCoroutine(routine); } // finish는 "멈춤"까지만,
                                                                                          // 완료 상태는 각 커맨드 루틴이 직접 ctx 확인 후, "최종 상태 세팅"을 시행하고 종료할 것

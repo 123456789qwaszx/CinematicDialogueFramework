@@ -7,7 +7,10 @@ public class CommandRunScope
     public CancellationToken Token { get; set; }
     
     // 이번 run에서 만든 것들을 추적
-    internal RunLifetime Lifetime { get; } = new();
+    internal RunLifetime StepLifetime { get; } = new();
+    
+    // 커맨드(BGM 등)의 확장성 위해 추가. Step이 종료하더라도, 아예 Session이 끝나거나, 특정시점까지 유지.
+    internal RunLifetime RunLifetime  { get; } = new();
     
     public CommandRunScope(DialogueContext state)
     {
@@ -29,13 +32,12 @@ public class CommandRunScope
             Playback.IsNodeBusy = busy;
     }
     
-    // 어떤 도메인이든 등록 가능 (DOTween/Coroutine 타입 몰라도 됨)
-    public void Track(Action cancel, Action finish = null)
-        => Lifetime.Track(cancel, finish);
+    // 스텝 종료 시 호출
+    public void CleanupStep(CleanupPolicy policy) => StepLifetime.Cleanup(policy);
+    // 세션 종료 시 호출
+    public void CleanupRun(CleanupPolicy policy) => RunLifetime.Cleanup(policy);
 
-    // Executor가 Stop/Skip/종료 시 호출하는 단일 정리 포인트
-    public void Cleanup(CleanupPolicy policy)
-    {
-        Lifetime.Cleanup(policy);
-    }
+    // 어떤 도메인이든 등록 가능 (DOTween/Coroutine 타입 몰라도 됨)
+    public void TrackStep(Action cancel, Action finish = null) => StepLifetime.Track(cancel, finish);
+    public void TrackRun (Action cancel, Action finish = null) => RunLifetime.Track(cancel, finish);
 }
