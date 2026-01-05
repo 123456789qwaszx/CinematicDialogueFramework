@@ -41,7 +41,11 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         if (node == null || scope == null)
             return;
 
-        Stop();
+        _activeScope = scope;
+        
+        CleanupPolicy policy = DecideCleanupPolicy(_activeScope);
+        _activeScope.CleanupStep(policy);
+        
         List<ISequenceCommand> commands = BuildCommandsFromStep(node, stepIndex);
         if (commands == null || commands.Count == 0)
         {
@@ -73,8 +77,6 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
                 return;
             }
         }
-        
-        _activeScope = scope;
         
         ResetToken();
         _activeScope.Token = _cts.Token;
@@ -121,12 +123,9 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         }
     }
 
-    public void Stop()
-    {
-        CleanupPolicy policy = DecideCleanupPolicy(_activeScope);
-        Stop(policy);
-    }
-
+    public void Stop() => Stop(CleanupPolicy.Cancel);
+    public void FinishStep() => Stop(CleanupPolicy.Finish);
+    
     public void Stop(CleanupPolicy policy)
     {
         if (_isStopInProgress)
@@ -151,6 +150,8 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
             if (_activeScope != null)
             {
                 _activeScope.CleanupStep(policy);
+                _activeScope.CleanupRun(policy);
+                
                 _activeScope.SetNodeBusy(false);
                 _activeScope.Token = CancellationToken.None;
                 _activeScope = null;
@@ -228,7 +229,6 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         _cts.Dispose();
         _cts = null;
     }
-    
     
     private void Log(string msg)
     {

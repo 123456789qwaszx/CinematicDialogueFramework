@@ -19,6 +19,7 @@ public interface INodeExecutor
 {
     void PlayStep(NodeSpec node, int stepIndex, CommandRunScope scope, DialogueLine fallbackLine = null);
     void Stop();
+    void FinishStep();
 }
 
 /// <summary>

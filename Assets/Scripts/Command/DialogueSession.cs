@@ -121,11 +121,14 @@ public sealed class DialogueSession
 
     public void EndDialogue()
     {
+        _gateAdvancer.ClearLatchedSignals();
+        
+        _output.FinishStep();
+        
+        _output.Hide();
+        
         _situation = null;
         _state = null;
-
-        _gateAdvancer.ClearLatchedSignals();
-        _output.Hide();
     }
 
     #endregion
