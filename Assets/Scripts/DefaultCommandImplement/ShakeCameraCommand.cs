@@ -16,7 +16,7 @@ public sealed class ShakeCameraCommand : CommandBase
     protected override SkipPolicy SkipPolicy => SkipPolicy.Ignore;
     public override bool WaitForCompletion => false;
     
-    protected override IEnumerator ExecuteInner(NodePlayScope scope)
+    protected override IEnumerator ExecuteInner(CommandRunScope scope)
     {
         _cameraShake.Shake(_strength, _duration);
         yield break;

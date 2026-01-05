@@ -1,9 +1,5 @@
 using System.Collections;
-using System.Threading;
 using UnityEngine;
-
-
-
 
 public abstract class CommandBase : ISequenceCommand
 {
@@ -13,9 +9,9 @@ public abstract class CommandBase : ISequenceCommand
     protected virtual SkipPolicy SkipPolicy => SkipPolicy.CompleteImmediately;
     
     public virtual bool WaitForCompletion => true;
-    protected bool IsCancelled(NodePlayScope scope) => scope.Token.IsCancellationRequested;
+    protected bool IsCancelled(CommandRunScope scope) => scope.Token.IsCancellationRequested;
 
-    public IEnumerator Execute(NodePlayScope scope)
+    public IEnumerator Execute(CommandRunScope scope)
     {
         if (scope == null) yield break;
         if (scope.Token.IsCancellationRequested) yield break;
@@ -44,11 +40,11 @@ public abstract class CommandBase : ISequenceCommand
         if (inner != null) yield return inner;
     }
 
-    protected abstract IEnumerator ExecuteInner(NodePlayScope scope);
+    protected abstract IEnumerator ExecuteInner(CommandRunScope scope);
 
-    protected virtual void OnSkip(NodePlayScope scope) { }
+    protected virtual void OnSkip(CommandRunScope scope) { }
     
-    protected IEnumerator Wait(NodePlayScope scope, float seconds)
+    protected IEnumerator Wait(CommandRunScope scope, float seconds)
     {
         float elapsed = 0f;
         while (elapsed < seconds)

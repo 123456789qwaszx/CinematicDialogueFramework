@@ -61,7 +61,7 @@ public sealed class NodeViewModelBuilder
         for (int i = 0; i < commands.Count; i++)
         {
             CommandSpecBase spec = commands[i];
-            if (spec is DefaultShowLineCommandSpec show && show.line != null)
+            if (spec is ShowLineCommandSpec show && show.line != null)
                 return show.line;
         }
 

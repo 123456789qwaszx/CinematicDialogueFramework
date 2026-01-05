@@ -20,7 +20,7 @@ public sealed class SequencePlayer
         _host = host;
     }
     
-    public IEnumerator PlayCommands(IReadOnlyList<ISequenceCommand> commands, NodePlayScope scope, int runId,
+    public IEnumerator PlayCommands(IReadOnlyList<ISequenceCommand> commands, CommandRunScope scope, int runId,
         Func<bool> isValid, Action<string> trace = null)
     {
         bool Valid() => isValid();
@@ -135,7 +135,7 @@ public sealed class SequencePlayer
 
     private static IEnumerator RunBackgroundRoutineToEnd(
         IEnumerator routine,
-        NodePlayScope ctx,
+        CommandRunScope ctx,
         Func<bool> isValid,
         Action onFinished)
     {

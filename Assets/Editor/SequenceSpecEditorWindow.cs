@@ -6,7 +6,6 @@ using UnityEditor;
 using UnityEditorInternal;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 public sealed class SequenceSpecEditorWindow : EditorWindow
 {

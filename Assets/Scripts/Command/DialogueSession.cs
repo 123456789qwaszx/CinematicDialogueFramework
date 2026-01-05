@@ -16,7 +16,7 @@ public sealed class DialogueSession
     private readonly DialogueRouteCatalogSO _routeCatalog;
 
     public DialogueContext Context { get; }
-    private readonly NodePlayScope _nodeScope;
+    private readonly CommandRunScope _nodeScope;
 
     // Runtime state
     private SequenceSpecSO _situation;
@@ -43,7 +43,7 @@ public sealed class DialogueSession
         _output = output;
         _routeCatalog = routeCatalog;
         Context = new DialogueContext { Modes = modes };
-        _nodeScope = new NodePlayScope(Context);
+        _nodeScope = new CommandRunScope(Context);
     }
 
 

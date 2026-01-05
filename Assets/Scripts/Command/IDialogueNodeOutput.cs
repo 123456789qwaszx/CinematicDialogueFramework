@@ -5,7 +5,7 @@ public interface IDialogueNodeOutput
     void Show(NodeViewModel vm);
     void Hide();
     void ShowSystemMessage(string msg);
-    void PlayStep(NodeSpec node, int stepIndex, NodePlayScope scope, DialogueLine fallbackLine = null);
+    void PlayStep(NodeSpec node, int stepIndex, CommandRunScope scope, DialogueLine fallbackLine = null);
 }
 
 public sealed class DialogueNodeOutputComposite : IDialogueNodeOutput
@@ -28,7 +28,7 @@ public sealed class DialogueNodeOutputComposite : IDialogueNodeOutput
     public void Hide() => _presenter?.Hide();
     public void ShowSystemMessage(string msg) => _presenter?.PresentSystemMessage(msg);
     
-    public void PlayStep(NodeSpec node, int stepIndex, NodePlayScope scope, DialogueLine fallbackLine = null)
+    public void PlayStep(NodeSpec node, int stepIndex, CommandRunScope scope, DialogueLine fallbackLine = null)
     {
         _executor?.PlayStep(node, stepIndex, scope, fallbackLine);
     }

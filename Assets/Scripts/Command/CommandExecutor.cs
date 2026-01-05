@@ -16,7 +16,7 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
     // ---- Runtime state: execution ----
     private CancellationTokenSource _cts;
     private Coroutine _mainRoutine;
-    private NodePlayScope _activeScope;
+    private CommandRunScope _activeScope;
 
     // ---- Runtime state: control flags ----
     private int _runId;
@@ -34,7 +34,7 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
     private void OnDestroy() => Stop();
     
     
-    public void PlayStep(NodeSpec node, int stepIndex, NodePlayScope scope, DialogueLine fallbackLine = null)
+    public void PlayStep(NodeSpec node, int stepIndex, CommandRunScope scope, DialogueLine fallbackLine = null)
     {
         if (!_isInitialized)
             return;
@@ -47,7 +47,7 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         {
             if (fallbackLine != null)
             {
-                var fallbackSpec = new DefaultShowLineCommandSpec
+                var fallbackSpec = new ShowLineCommandSpec
                 {
                     line = fallbackLine,
                     // 필요하면 node 쪽에서 기본 screenId / widgetId를 꺼내서 세팅
@@ -83,7 +83,7 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         _mainRoutine = StartCoroutine(RunNode(commands, _activeScope, _runId));
     }
     
-    private IEnumerator RunNode(List<ISequenceCommand> commands, NodePlayScope scope, int runId)
+    private IEnumerator RunNode(List<ISequenceCommand> commands, CommandRunScope scope, int runId)
     {
         if (runId != _runId)
         {
@@ -234,7 +234,7 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         Debug.Log($"[CommandExecutor] {msg}", this);
     }
     
-    private static CleanupPolicy DecideCleanupPolicy(NodePlayScope scope)
+    private static CleanupPolicy DecideCleanupPolicy(CommandRunScope scope)
     {
         if (scope == null)
             return CleanupPolicy.Cancel;

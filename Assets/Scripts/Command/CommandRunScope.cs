@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 
-public class NodePlayScope
+public class CommandRunScope
 {
     public DialogueContext Playback { get; }
     public CancellationToken Token { get; set; }
@@ -9,7 +9,7 @@ public class NodePlayScope
     // 이번 run에서 만든 것들을 추적
     internal RunLifetime Lifetime { get; } = new();
     
-    public NodePlayScope(DialogueContext state)
+    public CommandRunScope(DialogueContext state)
     {
         Playback = state;
         Token = CancellationToken.None;

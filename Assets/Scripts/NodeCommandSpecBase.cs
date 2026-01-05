@@ -8,7 +8,7 @@ public abstract class CommandSpecBase
 }
 
 [Serializable]
-public sealed class DefaultShowLineCommandSpec : CommandSpecBase
+public sealed class ShowLineCommandSpec : CommandSpecBase
 {
     public DialogueLine line;
 }

@@ -19,7 +19,7 @@ public sealed class DefaultNodeCommandFactory : INodeCommandFactory
 
         switch (spec)
         {
-            case DefaultShowLineCommandSpec show:
+            case ShowLineCommandSpec show:
                 command = CreateShowLine(show);
                 return command != null;
 
@@ -33,12 +33,12 @@ public sealed class DefaultNodeCommandFactory : INodeCommandFactory
     }
     
     
-    private ISequenceCommand CreateShowLine(DefaultShowLineCommandSpec  spec)
+    private ISequenceCommand CreateShowLine(ShowLineCommandSpec  spec)
     {
         if (spec.line == null || _dialoguePresentation == null)
             return null;
 
-        return new ShowLineCommand(_dialoguePresentation, spec.line, spec.screenId, spec.widgetId);
+        return new DefaultShowLineCommand(_dialoguePresentation, spec.line, spec.screenId, spec.widgetId);
     }
 
     private ISequenceCommand CreateShakeCamera(DefaultShakeCameraCommandSpec  spec)
