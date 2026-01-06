@@ -12,15 +12,16 @@ public class StepGateAdvancer : IDisposable
     private readonly IInputSource _input;
     private readonly ITimeSource _time;
     private readonly ISignalBus _signals;
+    private readonly ISignalLatch _latch;
 
     // Signals are latched until consumed by a Signal gate token.
-    private readonly System.Collections.Generic.HashSet<string> _latchedSignals = new();
 
-    public StepGateAdvancer(IInputSource input, ITimeSource time, ISignalBus signals)
+    public StepGateAdvancer(IInputSource input, ITimeSource time, ISignalBus signals, ISignalLatch latch)
     {
-        _input   = input;
-        _time    = time;
+        _input = input;
+        _time = time;
         _signals = signals;
+        _latch = latch;
         _signals.OnSignal += OnSignal;
     }
 
@@ -32,8 +33,7 @@ public class StepGateAdvancer : IDisposable
     
     private void OnSignal(string key)
     {
-        if (!string.IsNullOrEmpty(key))
-            _latchedSignals.Add(key);
+        _latch.Latch(key);
     }
 
     /// <summary>
@@ -55,7 +55,7 @@ public class StepGateAdvancer : IDisposable
         {
             state.StepGate.StepIndex = state.StepGate.Tokens.Count;
             state.StepGate.InFlight = default;
-            _latchedSignals.Clear();
+            _latch.Clear();
             return true;
         }
 
@@ -147,20 +147,19 @@ public class StepGateAdvancer : IDisposable
     private bool TickSignal(DialogueRuntimeState state, string expectedKey)
     {
         state.StepGate.InFlight.WaitingSignalKey = expectedKey;
-    
-        if (!string.IsNullOrEmpty(expectedKey) && _latchedSignals.Remove(expectedKey))
+
+        if (!string.IsNullOrEmpty(expectedKey) && _latch.Consume(expectedKey))
         {
             state.StepGate.InFlight.WaitingSignalKey = null;
             ConsumeCurrent(state);
             return true;
         }
-    
         return false;
     }
     
     public void ClearLatchedSignals()
     {
-        _latchedSignals.Clear();
+        _latch.Clear();
     }
 
 

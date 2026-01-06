@@ -27,9 +27,10 @@ public sealed class DialogueBootstrap : MonoBehaviour
         NodeViewModelBuilder vmBuilder  = new ();
 
         // Compose runner (subscribes to signals)
-        UnityInputSource input        = new();
-        UnityTimeSource time          = new();
-        StepGateAdvancer gateRunner = new StepGateAdvancer(input, time, signals);
+        UnityInputSource input      = new();
+        UnityTimeSource time        = new();
+        SignalLatch latch           = new();
+        StepGateAdvancer gateRunner = new StepGateAdvancer(input, time, signals, latch);
 
         // Optional extension ports
         //CommandService service = new CommandService(commandServiceConfig);
