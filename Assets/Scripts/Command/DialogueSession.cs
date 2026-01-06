@@ -5,12 +5,10 @@ using UnityEngine;
 // but only Tick() is allowed to advance steps or nodes.
 public sealed class DialogueSession
 {
-    // Dependencies (injected)
-    private readonly DialogueResolver _resolver;
     private readonly StepGatePlanBuilder _gatePlanner;
     private readonly StepGateAdvancer _gateAdvancer;
     private readonly CommandExecutor _executor;
-    private readonly DialogueRouteCatalogSO _routeCatalog;
+    private readonly RouteCatalogSO _routeCatalog;
     
     public PresentationContext Context { get; }
     private readonly CommandRunScope _nodeScope;
@@ -19,17 +17,14 @@ public sealed class DialogueSession
     private SequenceSpecSO _situation;
     private DialogueRuntimeState _state;
     
-    // Ctor
     public DialogueSession(
-        DialogueResolver resolver,
         StepGatePlanBuilder gatePlanner,
         StepGateAdvancer gateRunner,
         CommandExecutor executor,
-        DialogueRouteCatalogSO routeCatalog,
+        RouteCatalogSO routeCatalog,
         PresentationModes modes
     )
     {
-        _resolver = resolver;
         _gatePlanner = gatePlanner;
         _gateAdvancer = gateRunner;
         _executor = executor;
@@ -43,20 +38,14 @@ public sealed class DialogueSession
 
     public void StartDialogue(string routeKey)
     {
-        _state = CreateInitialState(routeKey);
-        if (_state == null)
+        if (!_routeCatalog.TryResolve(routeKey, out Route route, out SequenceSpecSO sequence))
         {
-            Debug.LogWarning($"StartDialogue failed. Invalid routeKey='{routeKey}'");
+            Debug.LogWarning($"StartDialogue failed. routeKey='{routeKey}'");
             return;
         }
-
-        _situation = _resolver.Resolve(routeKey);
-        if (_situation == null)
-        {
-            Debug.LogWarning(
-                $"Missing SituationSpec. situationKey='{_state.SituationKey}', routeKey='{_state.RouteKey}'");
-            return;
-        }
+        
+        _state = CreateInitialState(route);
+        _situation = sequence;
 
         _gatePlanner.BuildForCurrentNode(_situation, _state);
         
@@ -122,18 +111,12 @@ public sealed class DialogueSession
 
     #region internal helpers
 
-    private DialogueRuntimeState CreateInitialState(string routeKey)
+    private DialogueRuntimeState CreateInitialState(Route route)
     {
-        if (!_routeCatalog.TryGetRoute(routeKey, out DialogueRoute route))
-        {
-            Debug.LogWarning($"RouteKey='{routeKey}' not found");
-            return null;
-        }
-
         return new DialogueRuntimeState
         {
-            RouteKey = routeKey,
-            SituationKey = route.SequenceKey,
+            RouteKey = route.RouteKey,
+            SituationKey = route.StartKey,
             BranchKey = "Default",
             VariantKey = "Default",
             CurrentNodeIndex = 0,
