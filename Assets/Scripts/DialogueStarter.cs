@@ -2,14 +2,14 @@ using UnityEngine;
 
 public class DialogueStarter 
 {
-    private readonly DialogueSession _session;
-    public DialogueSession Session => _session;
+    private readonly PresentationSession _session;
+    public PresentationSession Session => _session;
 
-    public DialogueStarter(DialogueSession session) => _session = session;
+    public DialogueStarter(PresentationSession session) => _session = session;
 
     public void StartDialogue(string routeKey, object payload = null)
     {
-        _session.StartDialogue(routeKey);
+        _session.Start(routeKey);
     }
     
     public void Stop()
@@ -20,7 +20,7 @@ public class DialogueStarter
     public void Restart(string routeKey, object payload = null)
     {
         _session.EndDialogue();
-        _session.StartDialogue(routeKey);
+        _session.Start(routeKey);
     }
     
     public bool ToggleSkip()

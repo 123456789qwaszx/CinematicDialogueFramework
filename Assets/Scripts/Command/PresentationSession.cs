@@ -1,9 +1,9 @@
 using UnityEngine;
 
-// DialogueSession is the sole owner of dialogue time progression.
+// PresentationSession is the sole owner of dialogue time progression.
 // All other components may report state or perform execution,
 // but only Tick() is allowed to advance steps or nodes.
-public sealed class DialogueSession
+public sealed class PresentationSession
 {
     private readonly StepGatePlanBuilder _gatePlanner;
     private readonly StepGateAdvancer _gateAdvancer;
@@ -12,12 +12,12 @@ public sealed class DialogueSession
     
     public PresentationContext Context { get; }
     private readonly CommandRunScope _nodeScope;
-
+    private SequenceSpecSO _sequence;
+    
     // Runtime state
-    private SequenceSpecSO _situation;
     private DialogueRuntimeState _state;
     
-    public DialogueSession(
+    public PresentationSession(
         StepGatePlanBuilder gatePlanner,
         StepGateAdvancer gateRunner,
         CommandExecutor executor,
@@ -36,18 +36,18 @@ public sealed class DialogueSession
 
     #region Public API
 
-    public void StartDialogue(string routeKey)
+    public void Start(string routeKey)
     {
         if (!_routeCatalog.TryResolve(routeKey, out Route route, out SequenceSpecSO sequence))
         {
-            Debug.LogWarning($"StartDialogue failed. routeKey='{routeKey}'");
+            Debug.LogWarning($"Session failed. routeKey='{routeKey}'");
             return;
         }
         
         _state = CreateInitialState(route);
-        _situation = sequence;
+        _sequence = sequence;
 
-        _gatePlanner.BuildForCurrentNode(_situation, _state);
+        _gatePlanner.BuildForCurrentNode(_sequence, _state);
         
         PresentAndPlayCurrentStep(
             nodeIndex: _state.CurrentNodeIndex,
@@ -58,7 +58,7 @@ public sealed class DialogueSession
     {
         // === TIME PROGRESSION BEGINS ===
 
-        if (_situation == null || _state == null) return;
+        if (_sequence == null || _state == null) return;
 
         while (true)
         {
@@ -75,7 +75,7 @@ public sealed class DialogueSession
                 _state.CurrentNodeIndex++;
                 int newNodeIndex = _state.CurrentNodeIndex;
 
-                if (_state.CurrentNodeIndex >= _situation.nodes.Count)
+                if (_state.CurrentNodeIndex >= _sequence.nodes.Count)
                 {
                     _gateAdvancer.ClearLatchedSignals();
                     EndDialogue();
@@ -83,7 +83,7 @@ public sealed class DialogueSession
                 }
 
                 _gateAdvancer.ClearLatchedSignals();
-                _gatePlanner.BuildForCurrentNode(_situation, _state);
+                _gatePlanner.BuildForCurrentNode(_sequence, _state);
 
                 int firstStep = _state.StepGate.StepIndex;
                 PresentAndPlayCurrentStep(newNodeIndex, firstStep);
@@ -103,7 +103,7 @@ public sealed class DialogueSession
         
         _executor.FinishStep();
         
-        _situation = null;
+        _sequence = null;
         _state = null;
     }
 
@@ -126,10 +126,10 @@ public sealed class DialogueSession
 
     private void PresentAndPlayCurrentStep(int nodeIndex, int stepIndex)
     {
-        if (nodeIndex < 0 || nodeIndex >= _situation.nodes.Count)
+        if (nodeIndex < 0 || nodeIndex >= _sequence.nodes.Count)
             return;
 
-        NodeSpec node = _situation.nodes[nodeIndex];
+        NodeSpec node = _sequence.nodes[nodeIndex];
         _executor.PlayStep(node, stepIndex, _nodeScope);
     }
     #endregion
