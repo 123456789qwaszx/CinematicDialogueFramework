@@ -4,10 +4,13 @@ using UnityEngine;
 public abstract class CommandBase : ISequenceCommand
 {
     public virtual string DebugName => GetType().Name;
-    // 스킵이면 그냥 안 해도 되는 단순 SFX, 장식 파티클, 작은 흔들림 등은 Ignore로 override
-    // 대사 출력/로그/시그널 발행 같은 커맨드는 ExecuteEvenIfSkipping으로 override
+    
+    // Ignore: drop trivial VFX/SFX/shakes on skip.
+    // ExecuteEvenIfSkipping: must still run (text/log/signals).
     protected virtual SkipPolicy SkipPolicy => SkipPolicy.CompleteImmediately;
     
+    // If true, the StepGateRunner waits for this command to finish before moving on.
+    // If false, it runs in the background (fire-and-forget) and should be tracked via SequencePlayer.
     public virtual bool WaitForCompletion => true;
     protected bool IsCancelled(CommandRunScope scope) => scope.Token.IsCancellationRequested;
 

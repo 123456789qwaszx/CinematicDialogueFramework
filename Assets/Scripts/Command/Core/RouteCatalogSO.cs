@@ -2,17 +2,19 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// Inspector-serialized entry (authoring data)
+// Inspector-serialized definition (authoring data)
 [Serializable]
-public sealed class RouteEntry
+public sealed class RouteMapping
 {
-    [Header("Route ID (authoring key)")]
+    [Header("Entry point (Start input)")]
+    [Tooltip("Lookup key passed to Start(routeKey). Must be unique within this catalog.")]
     public string routeKey;
+    
+    [Header("Target")]
+    [Tooltip("Catalog to search for the start sequence.")]
+    public SequenceCatalogSO sequenceCatalog;
 
-    [Header("Data")]
-    public SequenceDatabaseSO sequenceDatabase;
-
-    [Tooltip("Key to start from within the selected database (e.g. situationKey).")]
+    [Tooltip("SequenceSpecSO.sequenceKey to start from.")]
     public string startKey;
 }
 
@@ -20,76 +22,75 @@ public sealed class RouteEntry
 public readonly struct Route
 {
     public readonly string RouteKey;
-    public readonly SequenceDatabaseSO Database;
+    public readonly SequenceCatalogSO SequenceCatalog;
     public readonly string StartKey;
 
-    public Route(RouteEntry entry)
+    public Route(RouteMapping entry)
     {
         RouteKey = entry.routeKey;
-        Database = entry.sequenceDatabase;
+        SequenceCatalog = entry.sequenceCatalog;
         StartKey = entry.startKey;
     }
 }
 
-[CreateAssetMenu(fileName = "RouteCatalog", menuName = "CPS/Route Catalog")]
+[CreateAssetMenu(fileName = "RouteCatalog", menuName = "Presentation/Route Catalog")]
 public sealed class RouteCatalogSO : ScriptableObject, IRouteCatalog<Route>
 {
-    [SerializeField] private List<RouteEntry> entries = new();
-    
+    [SerializeField] private List<RouteMapping> routes = new();
+
     [Header("Fallback")]
     [SerializeField] private string fallbackRouteKey = "Default";
     [SerializeField] private string fallbackStartKey = "Default";
 
-    private Dictionary<string, RouteEntry> _dict;
-    
+    private Dictionary<string, RouteMapping> _dict;
+
     private void OnEnable() => Rebuild();
+
 #if UNITY_EDITOR
     private void OnValidate() => Rebuild();
 #endif
-    
+
     private void Rebuild()
     {
-        _dict = new Dictionary<string, RouteEntry>(StringComparer.Ordinal);
+        _dict = new Dictionary<string, RouteMapping>(StringComparer.Ordinal);
 
-        foreach (RouteEntry entry in entries)
+        foreach (RouteMapping def in routes)
         {
-            if (entry == null) continue;
-            if (string.IsNullOrWhiteSpace(entry.routeKey)) continue;
+            if (def == null) continue;
+            if (string.IsNullOrWhiteSpace(def.routeKey)) continue;
 
-            _dict[entry.routeKey] = entry;
+            _dict[def.routeKey] = def;
         }
     }
-    
+
     public bool TryGetRoute(string routeKey, out Route route)
     {
         route = default;
 
         if (_dict == null) Rebuild();
 
-        // 1) try requested
         if (!string.IsNullOrWhiteSpace(routeKey) &&
-            _dict.TryGetValue(routeKey, out var entry) &&
-            entry != null)
+            _dict.TryGetValue(routeKey, out RouteMapping def) &&
+            def != null)
         {
-            route = new Route(entry);
+            route = new Route(def);
             return true;
         }
 
-        // 2) fallback route
-        if (!string.IsNullOrWhiteSpace(fallbackRouteKey) &&
-            _dict.TryGetValue(fallbackRouteKey, out entry) &&
-            entry != null)
+        if (!string.IsNullOrWhiteSpace(fallbackRouteKey) && 
+            _dict.TryGetValue(fallbackRouteKey, out def) &&
+            def != null)
         {
-            route = new Route(entry);
+            route = new Route(def);
             return true;
         }
 
         Debug.LogWarning($"Route not found. routeKey='{routeKey}', fallbackRouteKey='{fallbackRouteKey}'");
         return false;
     }
-    
+
     /// <summary>
-    /// Resolve route + starting spec in one call (replaces the old Resolver).
+    /// Resolve route + starting spec in one call.
     /// </summary>
     public bool TryResolve(string routeKey, out Route route, out SequenceSpecSO startSpec)
     {
@@ -98,23 +99,21 @@ public sealed class RouteCatalogSO : ScriptableObject, IRouteCatalog<Route>
         if (!TryGetRoute(routeKey, out route))
             return false;
 
-        if (route.Database == null)
+        if (route.SequenceCatalog == null)
         {
-            Debug.LogWarning($"Route database is null. routeKey='{route.RouteKey}'");
+            Debug.LogWarning($"Route catalog is null. routeKey='{route.RouteKey}'");
             return false;
         }
 
-        // 1) try route.StartKey
         if (!string.IsNullOrWhiteSpace(route.StartKey) &&
-            route.Database.TryGetSituation(route.StartKey, out startSpec) &&
+            route.SequenceCatalog.TryGetSequence(route.StartKey, out startSpec) &&
             startSpec != null)
         {
             return true;
         }
 
-        // 2) fallback start key
         if (!string.IsNullOrWhiteSpace(fallbackStartKey) &&
-            route.Database.TryGetSituation(fallbackStartKey, out startSpec) &&
+            route.SequenceCatalog.TryGetSequence(fallbackStartKey, out startSpec) &&
             startSpec != null)
         {
             return true;

@@ -34,7 +34,7 @@ public sealed class CommandExecutor : MonoBehaviour
     private void OnDestroy() => Stop(CleanupPolicy.Cancel);
     
     
-    public void PlayStep(NodeSpec node, int stepIndex, CommandRunScope scope, DialogueLine fallbackLine = null)
+    public void PlayStep(NodeSpec node, int stepIndex, CommandRunScope scope)
     {
         if (!_isInitialized)
             return;
@@ -49,29 +49,29 @@ public sealed class CommandExecutor : MonoBehaviour
         List<ISequenceCommand> commands = BuildCommandsFromStep(node, stepIndex);
         if (commands == null || commands.Count == 0)
         {
-            if (fallbackLine != null)
-            {
-                // var fallbackSpec = new ISequenceCommand
-                // {
-                //     line = fallbackLine,
-                //     // 필요하면 node 쪽에서 기본 screenId / widgetId를 꺼내서 세팅
-                //     // screenId = node.defaultScreenId,
-                //     // widgetId = node.defaultWidgetId,
-                // };
-                //
-                // if (_commandFactory.TryCreate(fallbackSpec, out ISequenceCommand fallbackCommand)
-                //     && fallbackCommand != null)
-                // {
-                //     commands = new List<ISequenceCommand> { fallbackCommand };
-                // }
-                // else
-                // {
-                //     Log("Failed to create fallback ShowLine command");
-                //     return;
-                // }
-            }
-
-            else
+            // if (fallbackLine != null)
+            // {
+            //     var fallbackSpec = new ISequenceCommand
+            //     {
+            //         line = fallbackLine,
+            //         // 필요하면 node 쪽에서 기본 screenId / widgetId를 꺼내서 세팅
+            //         // screenId = node.defaultScreenId,
+            //         // widgetId = node.defaultWidgetId,
+            //     };
+            //     
+            //     if (_commandFactory.TryCreate(fallbackSpec, out ISequenceCommand fallbackCommand)
+            //         && fallbackCommand != null)
+            //     {
+            //         commands = new List<ISequenceCommand> { fallbackCommand };
+            //     }
+            //     else
+            //     {
+            //         Log("Failed to create fallback ShowLine command");
+            //         return;
+            //     }
+            // }
+            //
+            // else
             {
                 Log($"Step skipped: stepIndex={stepIndex} (no commands)");
                 return;

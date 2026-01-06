@@ -1,11 +1,11 @@
 using System;
 
 /// <summary>
-/// Evaluates the current step gate token and advances the step cursor when it is satisfied.
-/// 
+/// Evaluates the current step-gate token and advances the step cursor when the token is satisfied.
+///
 /// Contract:
-/// - Returns true if it consumed at least one gate token (StepIndex advanced or Skip jumped to end).
-/// - Returns false if blocked / waiting (e.g., busy animation, missing input, remaining delay, signal not yet received).
+/// - Returns true if it consumed at least one gate token (StepIndex advanced, or Skip jumped to end).
+/// - Returns false if blocked/waiting (e.g., node is busy, no input, delay not elapsed, signal not yet received).
 /// </summary>
 public class StepGateAdvancer : IDisposable
 {
@@ -13,8 +13,6 @@ public class StepGateAdvancer : IDisposable
     private readonly ITimeSource _time;
     private readonly ISignalBus _signals;
     private readonly ISignalLatch _latch;
-
-    // Signals are latched until consumed by a Signal gate token.
 
     public StepGateAdvancer(IInputSource input, ITimeSource time, ISignalBus signals, ISignalLatch latch)
     {
@@ -29,7 +27,6 @@ public class StepGateAdvancer : IDisposable
     {
         _signals.OnSignal -= OnSignal;
     }
-
     
     private void OnSignal(string key)
     {
@@ -43,17 +40,17 @@ public class StepGateAdvancer : IDisposable
     /// </summary>
     public bool TryAdvanceStepGate(SequenceProgressState state, PresentationContext ctx)
     {
-        if (state.StepGate.Tokens == null || state.StepGate.StepIndex >= state.StepGate.Tokens.Count)
+        if (state.StepGate.Tokens == null || state.StepGate.Cursor >= state.StepGate.Tokens.Count)
             return false;
 
-        // ✅ 0) 노드 연출이 아직 재생 중이면, 어떤 토큰도 소비하지 않는다 (Skip 모드 제외)
+        // If the node is still "busy" (typing/animations/commands running), do not consume any token.
         if (ctx != null && ctx.IsNodeBusy && !ctx.IsSkipping)
             return false;
 
-        // Skip: consume all remaining tokens immediately
+        // Skip: jump the gate cursor to the end (skip all remaining tokens).
         if (ctx != null && ctx.IsSkipping)
         {
-            state.StepGate.StepIndex = state.StepGate.Tokens.Count;
+            state.StepGate.Cursor = state.StepGate.Tokens.Count;
             state.StepGate.InFlight = default;
             _latch.Clear();
             return true;
@@ -143,7 +140,7 @@ public class StepGateAdvancer : IDisposable
 
         return false;
     }
-    
+
     private bool TickSignal(SequenceProgressState state, string expectedKey)
     {
         state.StepGate.InFlight.WaitingSignalKey = expectedKey;
@@ -154,18 +151,18 @@ public class StepGateAdvancer : IDisposable
             ConsumeCurrent(state);
             return true;
         }
+
         return false;
     }
-    
+
     public void ClearLatchedSignals()
     {
         _latch.Clear();
     }
 
-
     private static void ConsumeCurrent(SequenceProgressState state)
     {
-        state.StepGate.StepIndex++;
+        state.StepGate.Cursor++;
         state.StepGate.InFlight = default;
     }
 }

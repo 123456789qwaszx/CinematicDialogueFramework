@@ -3,7 +3,11 @@ using System.Collections.Generic;
 
 public enum CleanupPolicy { Cancel, Finish }
 
-public class RunLifetime
+/// <summary>
+/// Tracks cleanup callbacks registered by commands (e.g., tweens, coroutines, event handlers).
+/// Intended to be owned by CommandRunScope and cleaned up at a boundary (step or run).
+/// </summary>
+public sealed class LifetimeScope
 {
     private readonly List<(Action cancel, Action finish)> _items = new();
 
@@ -23,7 +27,7 @@ public class RunLifetime
                 if (policy == CleanupPolicy.Finish) (finish ?? cancel)?.Invoke();
                 else cancel?.Invoke();
             }
-            catch { /* cleanup은 방어적으로 */ }
+            catch { }
         }
 
         _items.Clear();

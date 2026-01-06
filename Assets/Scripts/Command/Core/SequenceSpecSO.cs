@@ -23,8 +23,8 @@ public class NodeSpec
 public class SequenceSpecSO : ScriptableObject
 {
     /// <summary>
-    /// Key used to locate this situation inside a DialogueSequenceData.
-    /// Must match (DialogueRoute).SituationKey.
+    /// Key used to locate this sequence inside a SequenceCatalogSO.
+    /// Must match (RouteCatalogSO).(RouteDefinition).StartKey(string).
     /// </summary>
     public string sequenceKey;
 

@@ -2,31 +2,31 @@ using System.Collections.Generic;
 
 public class StepGatePlanBuilder
 {
-    public void BuildForCurrentNode(SequenceSpecSO situation, SequenceProgressState state)
+    public void BuildForCurrentNode(SequenceSpecSO sequence, SequenceProgressState state)
     {
         var gate = new StepGateState
         {
             Tokens      = new List<GateToken>(8),
-            StepIndex = 0,
+            Cursor   = 0,
             InFlight    = default
         };
 
-        if (state == null || situation == null || situation.nodes == null)
+        if (state == null || sequence == null || sequence.nodes == null)
         {
             gate.Tokens.Add(GateToken.Immediately());
             if (state != null) state.StepGate = gate;
             return;
         }
 
-        // End-of-situation: 최소 1 토큰 보장
-        if (state.CurrentNodeIndex >= situation.nodes.Count)
+        // End-of-sequence: always ensure at least one token
+        if (state.CurrentNodeIndex >= sequence.nodes.Count)
         {
             gate.Tokens.Add(GateToken.Immediately());
             state.StepGate = gate;
             return;
         }
 
-        NodeSpec node = situation.nodes[state.CurrentNodeIndex];
+        NodeSpec node = sequence.nodes[state.CurrentNodeIndex];
 
         if (node == null || node.steps == null || node.steps.Count == 0)
         {
@@ -39,9 +39,11 @@ public class StepGatePlanBuilder
         {
             StepSpec step = node.steps[i];
 
-            // step 자체가 null이거나 gate가 default면 Input으로 보정
-            GateToken token = (step == null) ? default : step.gate;
-            if (EqualityComparer<GateToken>.Default.Equals(token, default))
+            // If the step is null or its gate token is default/unset, fall back to Input.
+            GateToken token = step?.gate ?? default;
+            
+            bool isUnset = EqualityComparer<GateToken>.Default.Equals(token, default);
+            if (isUnset)
                 token = GateToken.Input();
 
             gate.Tokens.Add(token);

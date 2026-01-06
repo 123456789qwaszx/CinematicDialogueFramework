@@ -33,7 +33,6 @@ public sealed class PresentationSession
         _nodeScope = new CommandRunScope(Context);
     }
     
-
     #region Public API
 
     public void Start(string routeKey)
@@ -51,7 +50,16 @@ public sealed class PresentationSession
         
         PresentAndPlayCurrentStep(
             nodeIndex: _state.CurrentNodeIndex,
-            stepIndex: _state.StepGate.StepIndex);
+            stepIndex: _state.StepGate.Cursor);
+    }
+
+
+    public void End()
+    {
+        _gateAdvancer.ClearLatchedSignals();
+        _executor.FinishStep();
+        _sequence = null;
+        _state = null;
     }
 
     public void Tick()
@@ -67,7 +75,7 @@ public sealed class PresentationSession
                 break;
 
             int currentNode = _state.CurrentNodeIndex;
-            int currentStep = _state.StepGate.StepIndex;
+            int currentStep = _state.StepGate.Cursor;
 
             if (_state.IsNodeStepsCompleted)
             {
@@ -78,14 +86,14 @@ public sealed class PresentationSession
                 if (_state.CurrentNodeIndex >= _sequence.nodes.Count)
                 {
                     _gateAdvancer.ClearLatchedSignals();
-                    EndDialogue();
+                    End();
                     return;
                 }
 
                 _gateAdvancer.ClearLatchedSignals();
                 _gatePlanner.BuildForCurrentNode(_sequence, _state);
 
-                int firstStep = _state.StepGate.StepIndex;
+                int firstStep = _state.StepGate.Cursor;
                 PresentAndPlayCurrentStep(newNodeIndex, firstStep);
                 return;
             }
@@ -96,17 +104,7 @@ public sealed class PresentationSession
 
         // === TIME PROGRESSION ENDS ===
     }
-
-    public void EndDialogue()
-    {
-        _gateAdvancer.ClearLatchedSignals();
-        
-        _executor.FinishStep();
-        
-        _sequence = null;
-        _state = null;
-    }
-
+    
     #endregion
 
     #region internal helpers
