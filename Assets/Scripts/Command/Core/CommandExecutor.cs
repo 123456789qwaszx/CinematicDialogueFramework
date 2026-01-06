@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
 
-public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
+public sealed class CommandExecutor : MonoBehaviour
 {
     [Header("Debug")]
     [SerializeField] private bool enableDebugLog = true;
@@ -51,24 +51,24 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         {
             if (fallbackLine != null)
             {
-                var fallbackSpec = new ShowLineCommandSpec
-                {
-                    line = fallbackLine,
-                    // 필요하면 node 쪽에서 기본 screenId / widgetId를 꺼내서 세팅
-                    // screenId = node.defaultScreenId,
-                    // widgetId = node.defaultWidgetId,
-                };
-
-                if (_commandFactory.TryCreate(fallbackSpec, out ISequenceCommand fallbackCommand)
-                    && fallbackCommand != null)
-                {
-                    commands = new List<ISequenceCommand> { fallbackCommand };
-                }
-                else
-                {
-                    Log("Failed to create fallback ShowLine command");
-                    return;
-                }
+                // var fallbackSpec = new ISequenceCommand
+                // {
+                //     line = fallbackLine,
+                //     // 필요하면 node 쪽에서 기본 screenId / widgetId를 꺼내서 세팅
+                //     // screenId = node.defaultScreenId,
+                //     // widgetId = node.defaultWidgetId,
+                // };
+                //
+                // if (_commandFactory.TryCreate(fallbackSpec, out ISequenceCommand fallbackCommand)
+                //     && fallbackCommand != null)
+                // {
+                //     commands = new List<ISequenceCommand> { fallbackCommand };
+                // }
+                // else
+                // {
+                //     Log("Failed to create fallback ShowLine command");
+                //     return;
+                // }
             }
 
             else
@@ -206,7 +206,7 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
     }
     
     private void ResetToken()
-    { // 새 실행용 토큰 생성만 담당
+    { // Only responsible for creating a new token for the next run.
         _cts?.Dispose();
         _cts = new CancellationTokenSource();
     }
@@ -238,7 +238,7 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
         if (scope == null)
             return CleanupPolicy.Cancel;
 
-        // Skip은 "즉시 완료 상태"
+        // Skip means "complete immediately".
         if (scope.IsSkipping)
             return CleanupPolicy.Finish;
 

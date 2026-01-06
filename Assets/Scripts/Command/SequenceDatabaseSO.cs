@@ -7,7 +7,6 @@ public class SequenceDatabaseSO : ScriptableObject
 {
     public string sequenceId;
 
-    // ✅ 인라인 작성 대신, 작성된 SituationSpecSO를 참조
     public List<SequenceSpecSO> situations = new();
 
     private Dictionary<string, SequenceSpecSO> _situationsDict;

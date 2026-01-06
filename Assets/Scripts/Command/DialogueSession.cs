@@ -5,49 +5,39 @@ using UnityEngine;
 // but only Tick() is allowed to advance steps or nodes.
 public sealed class DialogueSession
 {
-    private const string FallbackRouteKey = "Default";
-
     // Dependencies (injected)
     private readonly DialogueResolver _resolver;
     private readonly StepGatePlanBuilder _gatePlanner;
     private readonly StepGateAdvancer _gateAdvancer;
-    private readonly NodeViewModelBuilder _vmBuilder;
-    private readonly IDialogueNodeOutput _output;
+    private readonly CommandExecutor _executor;
     private readonly DialogueRouteCatalogSO _routeCatalog;
-
-    public DialogueContext Context { get; }
+    
+    public PresentationContext Context { get; }
     private readonly CommandRunScope _nodeScope;
 
     // Runtime state
     private SequenceSpecSO _situation;
     private DialogueRuntimeState _state;
-
-
-    // Public surface
-
+    
     // Ctor
     public DialogueSession(
         DialogueResolver resolver,
         StepGatePlanBuilder gatePlanner,
         StepGateAdvancer gateRunner,
-        NodeViewModelBuilder vmBuilder,
-        IDialogueNodeOutput output,
+        CommandExecutor executor,
         DialogueRouteCatalogSO routeCatalog,
-        DialoguePlaybackModes modes
+        PresentationModes modes
     )
     {
         _resolver = resolver;
         _gatePlanner = gatePlanner;
         _gateAdvancer = gateRunner;
-        _vmBuilder = vmBuilder;
-        _output = output;
+        _executor = executor;
         _routeCatalog = routeCatalog;
-        Context = new DialogueContext { Modes = modes };
+        Context = new PresentationContext { Modes = modes };
         _nodeScope = new CommandRunScope(Context);
     }
-
-
-    //_nodeScope ??= new NodePlayScope(_commandService, Context);
+    
 
     #region Public API
 
@@ -99,7 +89,6 @@ public sealed class DialogueSession
                 if (_state.CurrentNodeIndex >= _situation.nodes.Count)
                 {
                     _gateAdvancer.ClearLatchedSignals();
-                    _output.ShowSystemMessage("(End of Situation)");
                     EndDialogue();
                     return;
                 }
@@ -123,9 +112,7 @@ public sealed class DialogueSession
     {
         _gateAdvancer.ClearLatchedSignals();
         
-        _output.FinishStep();
-        
-        _output.Hide();
+        _executor.FinishStep();
         
         _situation = null;
         _state = null;
@@ -139,8 +126,8 @@ public sealed class DialogueSession
     {
         if (!_routeCatalog.TryGetRoute(routeKey, out DialogueRoute route))
         {
-            if (!_routeCatalog.TryGetRoute(FallbackRouteKey, out route))
-                return null;
+            Debug.LogWarning($"RouteKey='{routeKey}' not found");
+            return null;
         }
 
         return new DialogueRuntimeState
@@ -158,13 +145,9 @@ public sealed class DialogueSession
     {
         if (nodeIndex < 0 || nodeIndex >= _situation.nodes.Count)
             return;
-        //Debug.Log($"[Gate] tokens={_state.StepGate.Tokens?.Count ?? -1}, cursor={_state.StepGate.StepIndex}");
-
-        NodeViewModel viewModel = _vmBuilder.Build(_situation, _state);
-        _output.Show(viewModel);
 
         NodeSpec node = _situation.nodes[nodeIndex];
-        _output.PlayStep(node, stepIndex, _nodeScope, fallbackLine : new DialogueLine());
+        _executor.PlayStep(node, stepIndex, _nodeScope);
     }
     #endregion
 }

@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 
 [Serializable]
-public sealed class DialoguePlaybackModes
+public sealed class PresentationModes
 {
     public bool IsAutoMode;
     public bool IsSkipping;
@@ -19,17 +19,19 @@ public sealed class DialoguePlaybackModes
 }
 
 [Serializable]
-public sealed class DialogueContext
+public sealed class PresentationContext
 {
-    [Tooltip("Shared playback modes (Auto/Skip/TimeScale/Delay). Must be assigned.")]
-    public DialoguePlaybackModes Modes;
+    /// <summary>
+    /// - Shared playback modes (Auto/Skip/TimeScale/Delay). Must be assigned.
+    /// </summary>
+    public PresentationModes Modes;
 
-    // -------- per-session runtime flags --------
-    public bool IsNodeBusy;    // 커맨드/타이핑 등 연출이 재생 중인지 (세션 로컬)
-    public bool IsClosed;      // ESC/Toast 닫기 등으로 이 세션만 닫혔는지
-    public bool BlockInput;    // 필요시 이 세션 입력만 막기(모달 등)
+    // ---- per-session runtime flags ----
+    public bool IsNodeBusy;    // Whether a presentation is currently playing (commands/typing/etc.) (session-local)
+    public bool IsClosed;      // Whether this session has been closed (e.g., ESC / toast close)
+    public bool BlockInput;    // Optionally blocks input for this session only (e.g., modal)
 
-    // -------- convenience read-only views (shared) --------
+    // ---- convenience read-only views ----
     public bool IsAutoMode => Modes != null && Modes.IsAutoMode;
     public bool IsSkipping => Modes != null && Modes.IsSkipping;
 
@@ -45,8 +47,7 @@ public sealed class DialogueContext
     public float AutoAdvanceDelay => Modes != null ? Modes.AutoAdvanceDelay : 0.6f;
 
     /// <summary>
-    /// 호출 정책 예시:
-    /// - StartDialogue 때: 세션 로컬 플래그만 리셋(모드는 유지)
+    /// - On StartDialogue: reset only session-local flags (keep shared modes)
     /// </summary>
     public void ResetSessionFlagsForStart()
     {

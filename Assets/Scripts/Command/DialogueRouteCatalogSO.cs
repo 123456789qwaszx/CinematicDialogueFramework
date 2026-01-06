@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 // Inspector-serialized entry (authoring data)
 [Serializable]
@@ -10,9 +9,9 @@ public class DialogueRouteEntry
     [Header("Route ID (read-only at runtime)")]
     public string routeKey;
 
-    [FormerlySerializedAs("sequenceData")] [Header("Data")]
+    [Header("Data")]
     public SequenceDatabaseSO sequenceDatabase;
-    [FormerlySerializedAs("se")] [FormerlySerializedAs("situationKey")] public string sequenceKey;
+    public string sequenceKey;
 }
 
 // Immutable runtime snapshot

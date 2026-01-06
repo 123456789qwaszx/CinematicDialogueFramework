@@ -3,16 +3,17 @@ using System.Threading;
 
 public class CommandRunScope
 {
-    public DialogueContext Playback { get; }
+    public PresentationContext Playback { get; }
     public CancellationToken Token { get; set; }
     
-    // 이번 run에서 만든 것들을 추적
+    // Tracks things created during this step (disposed/cleaned up when the step ends)
     internal RunLifetime StepLifetime { get; } = new();
     
-    // 커맨드(BGM 등)의 확장성 위해 추가. Step이 종료하더라도, 아예 Session이 끝나거나, 특정시점까지 유지.
+    // Added for command extensibility (e.g., BGM).
+    // This lifetime can outlive a single step and is cleaned up when the run/session ends,
     internal RunLifetime RunLifetime  { get; } = new();
     
-    public CommandRunScope(DialogueContext state)
+    public CommandRunScope(PresentationContext state)
     {
         Playback = state;
         Token = CancellationToken.None;
@@ -24,7 +25,7 @@ public class CommandRunScope
     public bool IsNodeBusy => Playback != null && Playback.IsNodeBusy;
     
     /// <summary>
-    /// this must be called only by the Executor
+    /// Must be called only by the Executor.
     /// </summary>
     public void SetNodeBusy(bool busy)
     {
@@ -32,12 +33,10 @@ public class CommandRunScope
             Playback.IsNodeBusy = busy;
     }
     
-    // 스텝 종료 시 호출
-    public void CleanupStep(CleanupPolicy policy) => StepLifetime.Cleanup(policy);
-    // 세션 종료 시 호출
-    public void CleanupRun(CleanupPolicy policy) => RunLifetime.Cleanup(policy);
+    public void CleanupStep(CleanupPolicy policy) => StepLifetime.Cleanup(policy); // Called when the step ends
+    public void CleanupRun(CleanupPolicy policy) => RunLifetime.Cleanup(policy); // Called when the run/session ends
 
-    // 어떤 도메인이든 등록 가능 (DOTween/Coroutine 타입 몰라도 됨)
+    // Domain-agnostic tracking (can register anything without depending on DOTween/Coroutine types)
     public void TrackStep(Action cancel, Action finish = null) => StepLifetime.Track(cancel, finish);
     public void TrackRun (Action cancel, Action finish = null) => RunLifetime.Track(cancel, finish);
 }
