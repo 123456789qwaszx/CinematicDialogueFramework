@@ -1,15 +1,11 @@
 using System;
 
 [Serializable]
-public sealed class DialogueRuntimeState
+public sealed class SequenceProgressState
 {
     public string RouteKey;
-    public string SituationKey;
+    public string StartKey;
     public int CurrentNodeIndex;
-    
-    // Reserved (not used yet; kept for save compatibility)
-    public string BranchKey;
-    public string VariantKey;
     
     public StepGateState StepGate;
     

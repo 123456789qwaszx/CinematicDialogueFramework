@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 public class StepGatePlanBuilder
 {
-    public void BuildForCurrentNode(SequenceSpecSO situation, DialogueRuntimeState state)
+    public void BuildForCurrentNode(SequenceSpecSO situation, SequenceProgressState state)
     {
         var gate = new StepGateState
         {

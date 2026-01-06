@@ -15,7 +15,7 @@ public sealed class PresentationSession
     private SequenceSpecSO _sequence;
     
     // Runtime state
-    private DialogueRuntimeState _state;
+    private SequenceProgressState _state;
     
     public PresentationSession(
         StepGatePlanBuilder gatePlanner,
@@ -111,14 +111,12 @@ public sealed class PresentationSession
 
     #region internal helpers
 
-    private DialogueRuntimeState CreateInitialState(Route route)
+    private SequenceProgressState CreateInitialState(Route route)
     {
-        return new DialogueRuntimeState
+        return new SequenceProgressState
         {
             RouteKey = route.RouteKey,
-            SituationKey = route.StartKey,
-            BranchKey = "Default",
-            VariantKey = "Default",
+            StartKey = route.StartKey,
             CurrentNodeIndex = 0,
             StepGate = default
         };
