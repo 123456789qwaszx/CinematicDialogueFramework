@@ -113,9 +113,6 @@ public sealed class CommandExecutor : MonoBehaviour, INodeExecutor
                 scope.SetNodeBusy(false);
                 scope.Token = CancellationToken.None;
 
-                if (ReferenceEquals(_activeScope, scope))
-                    _activeScope = null;
-
                 _mainRoutine = null;
 
                 Log($"Node End (runId={runId})");
