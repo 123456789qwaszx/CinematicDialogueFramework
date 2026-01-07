@@ -1368,8 +1368,8 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
         bool mod = e.control || e.command;
 
-        // ----- Delete / Backspace : delete selected command -----
-        if (!mod && (e.keyCode == KeyCode.Delete))
+        // ----- Ctrl/Cmd + E -----
+        if (mod && e.keyCode == KeyCode.E)
         {
             // Command 삭제 우선
             int idx = _commandsList.index;
