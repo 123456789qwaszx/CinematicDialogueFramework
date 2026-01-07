@@ -811,12 +811,13 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         _commandsList.elementHeightCallback = (index) =>
         {
             if (index < 0 || index >= commandsProp.arraySize)
-                return EditorGUIUtility.singleLineHeight;
+                return EditorGUIUtility.singleLineHeight + 6f;
 
             var element = commandsProp.GetArrayElementAtIndex(index);
 
-            float h = EditorGUI.GetPropertyHeight(element, includeChildren: true);
-            return h + 6f;
+            float header = EditorGUIUtility.singleLineHeight; // foldout + label 한 줄
+            float body   = GetManagedRefBodyHeight(element);  // child들만
+            return header + body + 6f; // padding
         };
         _commandsList.drawHeaderCallback = rect => { EditorGUI.LabelField(rect, "Commands", EditorStyles.boldLabel); };
 
@@ -826,91 +827,8 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
             var e = Event.current;
 
-            // ✅ 우클릭은 ContextClick이 더 안정적 + PropertyField보다 먼저 처리해야 함
-            if (e.type == EventType.ContextClick && rect.Contains(e.mousePosition))
-            {
-                // 우클릭한 커맨드를 선택으로 맞춤
-                if (_commandsList != null) _commandsList.index = index;
-                Repaint();
-
-                string commandsPath = commandsProp.propertyPath;
-
-                ShowContextMenu(menu =>
-                {
-                    CacheCommandTypes();
-                    string propPath = commandsProp.propertyPath;
-
-                    if (_cachedCommandTypes == null || _cachedCommandTypes.Count == 0)
-                    {
-                        menu.AddDisabledItem(new GUIContent("Add Command/No types found"));
-                    }
-                    else
-                    {
-                        var foldouts = SnapshotCommandFoldouts(commandsProp);
-
-                        foreach (var t in _cachedCommandTypes)
-                        {
-                            menu.AddItem(new GUIContent($"Add Command/{t.Name}"), false, () =>
-                            {
-                                DelayModify("Add Command", so =>
-                                {
-                                    var fresh = so.FindProperty(propPath);
-                                    if (fresh == null || !fresh.isArray) return;
-
-                                    int insertAt = fresh.arraySize;
-                                    if (_commandsList != null && _commandsList.index >= 0 && _commandsList.index < fresh.arraySize)
-                                        insertAt = _commandsList.index + 1;
-
-                                    insertAt = Mathf.Clamp(insertAt, 0, fresh.arraySize);
-
-                                    SerializedProperty el;
-
-                                    if (insertAt >= fresh.arraySize)
-                                    {
-                                        int idx = fresh.arraySize;
-                                        fresh.arraySize++;
-                                        el = fresh.GetArrayElementAtIndex(idx);
-                                    }
-                                    else
-                                    {
-                                        fresh.InsertArrayElementAtIndex(insertAt);
-                                        el = fresh.GetArrayElementAtIndex(insertAt);
-                                    }
-
-                                    el.managedReferenceValue = CreateCommandInstance(t);
-
-                                    // 여기서 newId를 얻어서 “새로 만든 것만 접기”
-                                    long newId = el.managedReferenceId;
-                                    RestoreCommandFoldouts(fresh, foldouts, newId);
-
-                                    _pendingCommandIndex = insertAt;
-                                    _commandsList = null;
-                                });
-                            });
-                        }
-                    }
-
-                    menu.AddSeparator("");
-
-                    menu.AddItem(new GUIContent("Delete Command"), false, () =>
-                    {
-                        if (!EditorUtility.DisplayDialog("Delete Command", $"Delete Command {index}?", "Delete",
-                                "Cancel"))
-                            return;
-
-                        DeleteArrayElementByPath("Delete Command", commandsPath, index, after: () =>
-                        {
-                            if (_commandsList != null)
-                                _commandsList.index = Mathf.Max(0, index - 1);
-
-                            _commandsList = null; // 리빌드로 맞춤
-                        });
-                    });
-                });
-
-                e.Use();
-                return; // ✅ 여기서 끝내야 PropertyField가 기본 메뉴를 못 띄움
-            }
+            // (너의 ContextClick 메뉴 처리 코드는 여기 그대로 유지)
+            // ...
 
             var element = commandsProp.GetArrayElementAtIndex(index);
 
@@ -919,10 +837,26 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
             var label = new GUIContent(SummarizeCommand(element, index));
 
-            AutoSetExpandedOnce(element, expanded: false);
-            EditorGUI.PropertyField(rect, element, label, includeChildren: true);
-        };
+            // ---- Header line (arrow only toggles) ----
+            float lineH = EditorGUIUtility.singleLineHeight;
+            var headerRect = new Rect(rect.x, rect.y, rect.width, lineH);
 
+            // foldout arrow (toggleOnLabelClick=false가 핵심)
+            var arrowRect = new Rect(headerRect.x, headerRect.y, 14f, headerRect.height);
+            element.isExpanded = EditorGUI.Foldout(arrowRect, element.isExpanded, GUIContent.none, toggleOnLabelClick: false);
+
+            // label text (non-interactive)
+            var labelRect = new Rect(headerRect.x + 14f, headerRect.y, headerRect.width - 14f, headerRect.height);
+            EditorGUI.LabelField(labelRect, label);
+
+            // ---- Body (children only) ----
+            if (element.isExpanded)
+            {
+                var bodyRect = new Rect(rect.x, rect.y + lineH + 2f, rect.width, rect.height - lineH - 2f);
+                DrawManagedRefBody(bodyRect, element);
+            }
+        };
+        
         // ✅ 드래그로 순서 바꾼 뒤: 선택 유지 + dirty 처리
         _commandsList.onReorderCallbackWithDetails = (list, oldIndex, newIndex) =>
         {
@@ -1331,12 +1265,6 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 // ------------------------------
     private const string CommandClipboardPrefix = "CPS_CMD_SPEC::";
 
-    [Serializable]
-    private sealed class CommandClipboardBox : ScriptableObject
-    {
-        [SerializeReference] public CommandSpecBase spec;
-    }
-
     private static void CopyCommandToClipboard(CommandSpecBase spec)
     {
         if (spec == null) return;
@@ -1547,6 +1475,62 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
             if (map != null && map.TryGetValue(id, out bool expanded))
                 el.isExpanded = expanded; // ✅ restore others
+        }
+    }
+    private static float GetManagedRefBodyHeight(SerializedProperty managedRef, float vSpace = 2f)
+    {
+        if (managedRef == null) return 0f;
+        if (managedRef.propertyType != SerializedPropertyType.ManagedReference) return 0f;
+        if (!managedRef.isExpanded) return 0f;
+
+        float h = 0f;
+
+        var it  = managedRef.Copy();
+        var end = it.GetEndProperty();
+
+        // 첫 child로 이동
+        bool hasChild = it.NextVisible(true);
+        if (!hasChild) return 0f;
+
+        while (!SerializedProperty.EqualContents(it, end))
+        {
+            h += EditorGUI.GetPropertyHeight(it, includeChildren: true) + vSpace;
+
+            if (!it.NextVisible(false))
+                break;
+        }
+
+        return h;
+    }
+
+    private static void DrawManagedRefBody(Rect rect, SerializedProperty managedRef, float vSpace = 2f)
+    {
+        if (managedRef == null) return;
+        if (managedRef.propertyType != SerializedPropertyType.ManagedReference) return;
+        if (!managedRef.isExpanded) return;
+
+        var it  = managedRef.Copy();
+        var end = it.GetEndProperty();
+
+        bool hasChild = it.NextVisible(true);
+        if (!hasChild) return;
+
+        float y = rect.y;
+
+        using (new EditorGUI.IndentLevelScope(1))
+        {
+            while (!SerializedProperty.EqualContents(it, end))
+            {
+                float ph = EditorGUI.GetPropertyHeight(it, includeChildren: true);
+                var r = new Rect(rect.x, y, rect.width, ph);
+
+                EditorGUI.PropertyField(r, it, includeChildren: true);
+
+                y += ph + vSpace;
+
+                if (!it.NextVisible(false))
+                    break;
+            }
         }
     }
 

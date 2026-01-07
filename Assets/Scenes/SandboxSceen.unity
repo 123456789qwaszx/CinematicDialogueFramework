@@ -202,7 +202,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 590301589}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: DialogueTestDriver, Assembly-CSharp
         m_MethodName: ToggleAutoMode
         m_Mode: 1
@@ -297,53 +297,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &279543598
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 279543599}
-  - component: {fileID: 279543600}
-  m_Layer: 0
-  m_Name: DialogueUI
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &279543599
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 279543598}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &279543600
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 279543598}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9c2792edb4e770e46b744342b684a8ac, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::UIDialoguePresenterTMP
-  root: {fileID: 0}
-  speaker: {fileID: 1184554652}
-  body: {fileID: 1629982602}
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -631,54 +584,6 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 572829970}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 708.9773, y: 497.6034, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &590301588
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 590301590}
-  - component: {fileID: 590301589}
-  m_Layer: 0
-  m_Name: DialogueTestDriver
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &590301589
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 590301588}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0f29ad605c0bc974ea30b0acf3970f17, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DialogueTestDriver
-  bootstrap: {fileID: 1644391588}
-  testRouteKey: Intro
-  delaySecond: 0.6
-  timeScale: 1
---- !u!4 &590301590
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 590301588}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 708.9773, y: 497.6034, z: 0}
@@ -1195,7 +1100,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 590301589}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: DialogueTestDriver, Assembly-CSharp
         m_MethodName: Restart
         m_Mode: 1
@@ -1328,7 +1233,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 590301589}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: DialogueTestDriver, Assembly-CSharp
         m_MethodName: SetTimeScale
         m_Mode: 1
@@ -2069,7 +1974,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 590301589}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: DialogueTestDriver, Assembly-CSharp
         m_MethodName: ToggleSkip
         m_Mode: 1
@@ -2202,7 +2107,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 590301589}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: DialogueTestDriver, Assembly-CSharp
         m_MethodName: StartDialogue
         m_Mode: 1
@@ -2555,103 +2460,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1629982600}
   m_CullTransparentMesh: 1
---- !u!1 &1642843084
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1642843086}
-  - component: {fileID: 1642843085}
-  m_Layer: 0
-  m_Name: DialogueRepository
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1642843085
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1642843084}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 52f35a39b264bfc4f868c48a4494cf98, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DialogueRepository
-  showDebugInfo: 1
-  sequenceResourcesPath: Dialogue/Sequence
-  speakerResourcesPath: Dialogue/Speaker
---- !u!4 &1642843086
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1642843084}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 708.9773, y: 497.6034, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1644391587
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1644391589}
-  - component: {fileID: 1644391588}
-  m_Layer: 0
-  m_Name: DialogueBootstrap
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1644391588
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1644391587}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e434cdcba802e3242a14f580fbd94b8d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Dialogue.StateMachine::DialogueBootstrap
-  routeCatalog: {fileID: 11400000, guid: 4ccfb75bb8d02dd488dabd3881e57edf, type: 2}
-  commandServiceConfig: {fileID: 11400000, guid: ad6a036cd11e1454baf8edcef05b855f, type: 2}
-  presenterBehaviour: {fileID: 279543600}
-  commandExecuter: {fileID: 35710888}
-  signals: {fileID: 1945730144}
-  enableDebugHotkeys: 1
---- !u!4 &1644391589
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1644391587}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 708.9773, y: 497.6034, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1705289287
 GameObject:
   m_ObjectHideFlags: 0
@@ -2735,7 +2543,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 590301589}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: DialogueTestDriver, Assembly-CSharp
         m_MethodName: DumpState
         m_Mode: 1
@@ -3004,7 +2812,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 590301589}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: DialogueTestDriver, Assembly-CSharp
         m_MethodName: Stop
         m_Mode: 1
@@ -3137,7 +2945,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 590301589}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: DialogueTestDriver, Assembly-CSharp
         m_MethodName: SetAutoDelay
         m_Mode: 1
@@ -3757,12 +3565,8 @@ SceneRoots:
   - {fileID: 832575519}
   - {fileID: 694275957}
   - {fileID: 986883646}
-  - {fileID: 279543599}
   - {fileID: 35710889}
   - {fileID: 1945730143}
-  - {fileID: 1642843086}
-  - {fileID: 1644391589}
   - {fileID: 1814730816}
   - {fileID: 572829971}
   - {fileID: 1558866247}
-  - {fileID: 590301590}
