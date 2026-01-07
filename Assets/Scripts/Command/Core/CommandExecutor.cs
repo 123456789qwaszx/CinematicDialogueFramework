@@ -49,31 +49,8 @@ public sealed class CommandExecutor : MonoBehaviour
         List<ISequenceCommand> commands = BuildCommandsFromStep(node, stepIndex);
         if (commands == null || commands.Count == 0)
         {
-            // if (fallbackLine != null)
-            // {
-            //     var fallbackSpec = new ISequenceCommand
-            //     {
-            //         line = fallbackLine,
-            //         // 필요하면 node 쪽에서 기본 screenId / widgetId를 꺼내서 세팅
-            //         // screenId = node.defaultScreenId,
-            //         // widgetId = node.defaultWidgetId,
-            //     };
-            //     
-            //     if (_commandFactory.TryCreate(fallbackSpec, out ISequenceCommand fallbackCommand)
-            //         && fallbackCommand != null)
-            //     {
-            //         commands = new List<ISequenceCommand> { fallbackCommand };
-            //     }
-            //     else
-            //     {
-            //         Log("Failed to create fallback ShowLine command");
-            //         return;
-            //     }
-            // }
-            //
-            // else
             {
-                Log($"Step skipped: stepIndex={stepIndex} (no commands)");
+                Log($"Step has no commands: stepIndex={stepIndex}");
                 return;
             }
         }
@@ -121,7 +98,7 @@ public sealed class CommandExecutor : MonoBehaviour
     }
 
     public void Stop() => Stop(CleanupPolicy.Cancel);
-    public void FinishStep() => Stop(CleanupPolicy.Finish);
+    public void FinishAll() => Stop(CleanupPolicy.Finish);
     
     public void Stop(CleanupPolicy policy)
     {

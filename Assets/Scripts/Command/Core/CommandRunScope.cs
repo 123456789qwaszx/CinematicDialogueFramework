@@ -3,7 +3,7 @@ using System.Threading;
 
 public sealed class CommandRunScope
 {
-    public PresentationContext Playback { get; }
+    private readonly PresentationContext _context;
     public CancellationToken Token { get; set; }
 
     /// <summary>
@@ -18,24 +18,24 @@ public sealed class CommandRunScope
     /// </summary>
     internal LifetimeScope RunLifetime { get; } = new();
 
-    public CommandRunScope(PresentationContext state)
+    public CommandRunScope(PresentationContext context)
     {
-        Playback = state;
+        _context = context;
         Token = CancellationToken.None;
     }
 
-    public bool IsSkipping => Playback != null && Playback.IsSkipping;
-    public bool IsAutoMode => Playback != null && Playback.IsAutoMode;
-    public float TimeScale => (Playback != null && Playback.TimeScale > 0f) ? Playback.TimeScale : 1f;
-    public bool IsNodeBusy => Playback != null && Playback.IsNodeBusy;
+    public bool IsSkipping => _context != null && _context.IsSkipping;
+    public bool IsAutoMode => _context != null && _context.IsAutoMode;
+    public float TimeScale => (_context != null && _context.TimeScale > 0f) ? _context.TimeScale : 1f;
+    public bool IsNodeBusy => _context != null && _context.IsNodeBusy;
 
     /// <summary>
     /// Must be called only by the Executor.
     /// </summary>
     public void SetNodeBusy(bool busy)
     {
-        if (Playback != null)
-            Playback.IsNodeBusy = busy;
+        if (_context != null)
+            _context.IsNodeBusy = busy;
     }
 
     // Boundary cleanup

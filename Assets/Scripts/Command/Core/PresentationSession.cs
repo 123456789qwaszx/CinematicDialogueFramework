@@ -5,17 +5,23 @@ using UnityEngine;
 // but only Tick() is allowed to advance steps or nodes.
 public sealed class PresentationSession
 {
+    // ---- Dependencies (injected) ----
     private readonly StepGatePlanBuilder _gatePlanner;
     private readonly StepGateAdvancer _gateAdvancer;
     private readonly CommandExecutor _executor;
     private readonly RouteCatalogSO _routeCatalog;
     
+    // ---- Session-owned context ----
     public PresentationContext Context { get; }
-    private readonly CommandRunScope _nodeScope;
+    
+    // ---- Active run (per-Session) ----
+    private CommandRunScope _sessionScope;
+    
+    // ---- Runtime state ----
+    private SequenceProgressState _state;
     private SequenceSpecSO _sequence;
     
-    // Runtime state
-    private SequenceProgressState _state;
+    public bool IsRunning => _sequence != null && _state != null;
     
     public PresentationSession(
         StepGatePlanBuilder gatePlanner,
@@ -29,8 +35,8 @@ public sealed class PresentationSession
         _gateAdvancer = gateRunner;
         _executor = executor;
         _routeCatalog = routeCatalog;
+
         Context = new PresentationContext { Modes = modes };
-        _nodeScope = new CommandRunScope(Context);
     }
     
     #region Public API
@@ -43,21 +49,21 @@ public sealed class PresentationSession
             return;
         }
         
-        _state = CreateInitialState(route);
+        _state = new SequenceProgressState(route);
         _sequence = sequence;
+        _sessionScope = new CommandRunScope(Context);
 
         _gatePlanner.BuildForCurrentNode(_sequence, _state);
         
-        PresentAndPlayCurrentStep(
+        PlayStep(
             nodeIndex: _state.CurrentNodeIndex,
             stepIndex: _state.StepGate.Cursor);
     }
-
-
+    
     public void End()
     {
         _gateAdvancer.ClearLatchedSignals();
-        _executor.FinishStep();
+        _executor.FinishAll();
         _sequence = null;
         _state = null;
     }
@@ -65,7 +71,6 @@ public sealed class PresentationSession
     public void Tick()
     {
         // === TIME PROGRESSION BEGINS ===
-
         if (_sequence == null || _state == null) return;
 
         while (true)
@@ -73,10 +78,7 @@ public sealed class PresentationSession
             bool advanced = _gateAdvancer.TryAdvanceStepGate(_state, Context);
             if (!advanced)
                 break;
-
-            int currentNode = _state.CurrentNodeIndex;
-            int currentStep = _state.StepGate.Cursor;
-
+            
             if (_state.IsNodeStepsCompleted)
             {
                 // ---- Node boundary ----
@@ -94,14 +96,16 @@ public sealed class PresentationSession
                 _gatePlanner.BuildForCurrentNode(_sequence, _state);
 
                 int firstStep = _state.StepGate.Cursor;
-                PresentAndPlayCurrentStep(newNodeIndex, firstStep);
+                PlayStep(newNodeIndex, firstStep);
                 return;
             }
 
             // ---- Step boundary ----
-            PresentAndPlayCurrentStep(currentNode, currentStep);
-        }
-
+            int currentNode = _state.CurrentNodeIndex;
+            int currentStep = _state.StepGate.Cursor;
+            PlayStep(currentNode, currentStep);
+        } 
+        
         // === TIME PROGRESSION ENDS ===
     }
     
@@ -109,24 +113,14 @@ public sealed class PresentationSession
 
     #region internal helpers
 
-    private SequenceProgressState CreateInitialState(Route route)
-    {
-        return new SequenceProgressState
-        {
-            RouteKey = route.RouteKey,
-            StartKey = route.StartKey,
-            CurrentNodeIndex = 0,
-            StepGate = default
-        };
-    }
-
-    private void PresentAndPlayCurrentStep(int nodeIndex, int stepIndex)
+    private void PlayStep(int nodeIndex, int stepIndex)
     {
         if (nodeIndex < 0 || nodeIndex >= _sequence.nodes.Count)
             return;
 
         NodeSpec node = _sequence.nodes[nodeIndex];
-        _executor.PlayStep(node, stepIndex, _nodeScope);
+        _executor.PlayStep(node, stepIndex, _sessionScope);
     }
+    
     #endregion
 }
