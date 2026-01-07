@@ -349,6 +349,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         EnsureCommandsList(stepProp, commandsProp);
         _commandsList?.DoLayoutList();
 
+        HandleCommandShortcuts(commandsProp);
         // ✅ Command 버튼을 리스트 아래로 이동
         using (new EditorGUILayout.HorizontalScope())
         {
@@ -1288,6 +1289,169 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         if (_autoExpandedOnce.Add(key))
             prop.isExpanded = true; // ✅ 처음 본 순간에만 펼침
     }
+    
+    // ------------------------------
+// Command Copy/Paste (SerializeReference Clipboard)
+// ------------------------------
+private const string CommandClipboardPrefix = "CPS_CMD_SPEC::";
+
+[Serializable]
+private sealed class CommandClipboardBox : ScriptableObject
+{
+    [SerializeReference] public CommandSpecBase spec;
+}
+
+private static void CopyCommandToClipboard(CommandSpecBase spec)
+{
+    if (spec == null) return;
+
+    var box = ScriptableObject.CreateInstance<CommandClipboardBox>();
+    try
+    {
+        box.spec = spec;
+        string json = EditorJsonUtility.ToJson(box);
+        EditorGUIUtility.systemCopyBuffer = CommandClipboardPrefix + json;
+    }
+    finally
+    {
+        DestroyImmediate(box);
+    }
+}
+
+private static bool TryGetClipboardJson(out string json)
+{
+    json = null;
+
+    string buf = EditorGUIUtility.systemCopyBuffer;
+    if (string.IsNullOrEmpty(buf)) return false;
+    if (!buf.StartsWith(CommandClipboardPrefix, StringComparison.Ordinal)) return false;
+
+    json = buf.Substring(CommandClipboardPrefix.Length);
+    return !string.IsNullOrEmpty(json);
+}
+
+private static CommandSpecBase CreateCommandFromJson(string json)
+{
+    if (string.IsNullOrEmpty(json)) return null;
+
+    var box = ScriptableObject.CreateInstance<CommandClipboardBox>();
+    try
+    {
+        EditorJsonUtility.FromJsonOverwrite(json, box);
+        return box.spec; // 새 인스턴스(다형성 유지)
+    }
+    finally
+    {
+        DestroyImmediate(box);
+    }
+}
+
+private void HandleCommandShortcuts(SerializedProperty commandsProp)
+{
+    if (commandsProp == null || !commandsProp.isArray) return;
+    if (_commandsList == null) return;
+
+    var e = Event.current;
+    if (e == null || e.type != EventType.KeyDown) return;
+
+    // 텍스트 필드 편집 중엔 Unity 기본 Ctrl+C/V를 존중
+    if (EditorGUIUtility.editingTextField) return;
+
+    bool mod = e.control || e.command; // Win/Linux: Ctrl, Mac: Cmd
+    if (!mod) return;
+
+    // ----- Ctrl/Cmd + C -----
+    if (e.keyCode == KeyCode.C)
+    {
+        int idx = _commandsList.index;
+        if (idx >= 0 && idx < commandsProp.arraySize)
+        {
+            var el = commandsProp.GetArrayElementAtIndex(idx);
+            if (el != null && el.propertyType == SerializedPropertyType.ManagedReference)
+            {
+                CopyCommandToClipboard(el.managedReferenceValue as CommandSpecBase);
+                e.Use();
+            }
+        }
+        return;
+    }
+
+    // ----- Ctrl/Cmd + V -----
+    if (e.keyCode == KeyCode.V)
+    {
+        if (!TryGetClipboardJson(out string json))
+            return;
+
+        // 붙여넣기 위치: 선택 커맨드 "다음" (선택 없으면 맨 끝)
+        int insertAt = commandsProp.arraySize;
+        int sel = _commandsList.index;
+        if (sel >= 0 && sel < commandsProp.arraySize)
+            insertAt = sel + 1;
+
+        string propPath = commandsProp.propertyPath;
+
+        DelayModify("Paste Command", so =>
+        {
+            var fresh = so.FindProperty(propPath);
+            if (fresh == null || !fresh.isArray) return;
+
+            insertAt = Mathf.Clamp(insertAt, 0, fresh.arraySize);
+
+            fresh.InsertArrayElementAtIndex(insertAt);
+            var pastedEl = fresh.GetArrayElementAtIndex(insertAt);
+
+            // 매 Paste마다 새 인스턴스를 만들어 넣기(연속 붙여넣기 시 동일 참조 방지)
+            pastedEl.managedReferenceValue = CreateCommandFromJson(json);
+
+            _pendingCommandIndex = insertAt; // 새로 붙인 커맨드 선택 유지
+            _commandsList = null;            // 리빌드 유도
+        });
+
+        e.Use();
+        return;
+    }
+
+    // (선택) Ctrl/Cmd + D = Duplicate (현재 선택 커맨드 복제)
+    if (e.keyCode == KeyCode.D)
+    {
+        int idx = _commandsList.index;
+        if (idx >= 0 && idx < commandsProp.arraySize)
+        {
+            var el = commandsProp.GetArrayElementAtIndex(idx);
+            if (el != null && el.propertyType == SerializedPropertyType.ManagedReference)
+            {
+                // 내부적으로 복사-붙여넣기 동작
+                CopyCommandToClipboard(el.managedReferenceValue as CommandSpecBase);
+
+                // 바로 Paste 트리거
+                // (키 이벤트 재사용하지 말고 로직만 호출)
+                if (TryGetClipboardJson(out string json))
+                {
+                    int insertAt = idx + 1;
+                    string propPath = commandsProp.propertyPath;
+
+                    DelayModify("Duplicate Command", so =>
+                    {
+                        var fresh = so.FindProperty(propPath);
+                        if (fresh == null || !fresh.isArray) return;
+
+                        insertAt = Mathf.Clamp(insertAt, 0, fresh.arraySize);
+                        fresh.InsertArrayElementAtIndex(insertAt);
+
+                        var pastedEl = fresh.GetArrayElementAtIndex(insertAt);
+                        pastedEl.managedReferenceValue = CreateCommandFromJson(json);
+
+                        _pendingCommandIndex = insertAt;
+                        _commandsList = null;
+                    });
+
+                    e.Use();
+                }
+            }
+        }
+    }
+}
+
 #if UNITY_EDITOR
     private static StepSpec CreateBlankStep()
     {
@@ -1357,6 +1521,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
         return clone;
     }
+    
 #endif
 
     // ------------------------------
