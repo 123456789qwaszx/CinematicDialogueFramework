@@ -752,8 +752,8 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
                     menu.AddItem(new GUIContent("Delete Step"), false, () =>
                     {
-                        if (!EditorUtility.DisplayDialog("Delete Step", $"Delete Step {index}?", "Delete", "Cancel"))
-                            return;
+                        // if (!EditorUtility.DisplayDialog("Delete Step", $"Delete Step {index}?", "Delete", "Cancel"))
+                        //     return;
 
                         string stepsPath = stepsProp.propertyPath;
 
@@ -822,40 +822,103 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         _commandsList.drawHeaderCallback = rect => { EditorGUI.LabelField(rect, "Commands", EditorStyles.boldLabel); };
 
         _commandsList.drawElementCallback = (rect, index, isActive, isFocused) =>
+{
+    if (index < 0 || index >= commandsProp.arraySize) return;
+
+    var e = Event.current;
+
+    // ✅ 1) 우클릭은 '요소 전체 영역'에서 먼저 가로챈다 (헤더+바디 포함)
+    if (e.type == EventType.ContextClick && rect.Contains(e.mousePosition))
+    {
+        if (_commandsList != null) _commandsList.index = index;
+        Repaint();
+
+        string propPath = commandsProp.propertyPath;
+        string commandsPath = commandsProp.propertyPath; // 너 기존 변수명 유지해도 됨
+
+        ShowContextMenu(menu =>
         {
-            if (index < 0 || index >= commandsProp.arraySize) return;
+            CacheCommandTypes();
 
-            var e = Event.current;
-
-            // (너의 ContextClick 메뉴 처리 코드는 여기 그대로 유지)
-            // ...
-
-            var element = commandsProp.GetArrayElementAtIndex(index);
-
-            rect.y += 2f;
-            rect.height -= 2f;
-
-            var label = new GUIContent(SummarizeCommand(element, index));
-
-            // ---- Header line (arrow only toggles) ----
-            float lineH = EditorGUIUtility.singleLineHeight;
-            var headerRect = new Rect(rect.x, rect.y, rect.width, lineH);
-
-            // foldout arrow (toggleOnLabelClick=false가 핵심)
-            var arrowRect = new Rect(headerRect.x, headerRect.y, 14f, headerRect.height);
-            element.isExpanded = EditorGUI.Foldout(arrowRect, element.isExpanded, GUIContent.none, toggleOnLabelClick: false);
-
-            // label text (non-interactive)
-            var labelRect = new Rect(headerRect.x + 14f, headerRect.y, headerRect.width - 14f, headerRect.height);
-            EditorGUI.LabelField(labelRect, label);
-
-            // ---- Body (children only) ----
-            if (element.isExpanded)
+            if (_cachedCommandTypes == null || _cachedCommandTypes.Count == 0)
             {
-                var bodyRect = new Rect(rect.x, rect.y + lineH + 2f, rect.width, rect.height - lineH - 2f);
-                DrawManagedRefBody(bodyRect, element);
+                menu.AddDisabledItem(new GUIContent("Add Command/No types found"));
             }
-        };
+            else
+            {
+                foreach (var t in _cachedCommandTypes)
+                {
+                    var foldouts = SnapshotCommandFoldouts(commandsProp);
+
+                    menu.AddItem(new GUIContent($"Add Command/{t.Name}"), false, () =>
+                    {
+                        DelayModify("Add Command", so =>
+                        {
+                            var fresh = so.FindProperty(propPath);
+                            if (fresh == null || !fresh.isArray) return;
+
+                            int insertAt = fresh.arraySize;
+                            if (_commandsList != null && _commandsList.index >= 0 && _commandsList.index < fresh.arraySize)
+                                insertAt = _commandsList.index + 1;
+
+                            fresh.InsertArrayElementAtIndex(insertAt);
+                            var el = fresh.GetArrayElementAtIndex(insertAt);
+                            el.managedReferenceValue = CreateCommandInstance(t);
+
+                            // ✅ 기존 폴드아웃 유지 + 새것만 접기
+                            RestoreCommandFoldouts(fresh, foldouts, el.managedReferenceId);
+
+                            _pendingCommandIndex = insertAt;
+                            _commandsList = null;
+                        });
+                    });
+                }
+            }
+
+            menu.AddSeparator("");
+
+            menu.AddItem(new GUIContent("Delete Command"), false, () =>
+            {
+                // if (!EditorUtility.DisplayDialog("Delete Command", $"Delete Command {index}?", "Delete", "Cancel"))
+                //     return;
+
+                DeleteArrayElementByPath("Delete Command", commandsPath, index, after: () =>
+                {
+                    if (_commandsList != null)
+                        _commandsList.index = Mathf.Max(0, index - 1);
+
+                    _commandsList = null;
+                });
+            });
+        });
+
+        e.Use();     // ✅ PropertyField의 기본 메뉴를 막는다
+        return;      // ✅ 더 그리면 안 됨 (그리면 기본 메뉴가 다시 먹음)
+    }
+
+    // ---- 여기부터는 평소 렌더 ----
+    var element = commandsProp.GetArrayElementAtIndex(index);
+
+    rect.y += 2f;
+    rect.height -= 2f;
+
+    var label = new GUIContent(SummarizeCommand(element, index));
+
+    float lineH = EditorGUIUtility.singleLineHeight;
+    var headerRect = new Rect(rect.x, rect.y, rect.width, lineH);
+
+    var arrowRect = new Rect(headerRect.x, headerRect.y, 14f, headerRect.height);
+    element.isExpanded = EditorGUI.Foldout(arrowRect, element.isExpanded, GUIContent.none, toggleOnLabelClick: false);
+
+    var labelRect = new Rect(headerRect.x + 14f, headerRect.y, headerRect.width - 14f, headerRect.height);
+    EditorGUI.LabelField(labelRect, label);
+
+    if (element.isExpanded)
+    {
+        var bodyRect = new Rect(rect.x, rect.y + lineH + 2f, rect.width, rect.height - lineH - 2f);
+        DrawManagedRefBody(bodyRect, element);
+    }
+};
         
         // ✅ 드래그로 순서 바꾼 뒤: 선택 유지 + dirty 처리
         _commandsList.onReorderCallbackWithDetails = (list, oldIndex, newIndex) =>
@@ -914,25 +977,25 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         _commandsList = null;
         Repaint();
     }
-
-    private void DeleteSelectedNode()
-    {
-        if (_nodesProp == null) return;
-        if (_selectedNode < 0 || _selectedNode >= _nodesProp.arraySize) return;
-
-        if (!EditorUtility.DisplayDialog("Delete Node", $"Delete Node {_selectedNode}?", "Delete", "Cancel"))
-            return;
-
-        Undo.RecordObject(targetSequence, "Delete Node");
-        _nodesProp.DeleteArrayElementAtIndex(_selectedNode);
-
-        _selectedNode = Mathf.Clamp(_selectedNode, 0, _nodesProp.arraySize - 1);
-        _selectedStep = -1;
-
-        EditorUtility.SetDirty(targetSequence);
-        _stepsList = null;
-        _commandsList = null;
-    }
+    //
+    // private void DeleteSelectedNode()
+    // {
+    //     if (_nodesProp == null) return;
+    //     if (_selectedNode < 0 || _selectedNode >= _nodesProp.arraySize) return;
+    //
+    //     if (!EditorUtility.DisplayDialog("Delete Node", $"Delete Node {_selectedNode}?", "Delete", "Cancel"))
+    //         return;
+    //
+    //     Undo.RecordObject(targetSequence, "Delete Node");
+    //     _nodesProp.DeleteArrayElementAtIndex(_selectedNode);
+    //
+    //     _selectedNode = Mathf.Clamp(_selectedNode, 0, _nodesProp.arraySize - 1);
+    //     _selectedStep = -1;
+    //
+    //     EditorUtility.SetDirty(targetSequence);
+    //     _stepsList = null;
+    //     _commandsList = null;
+    // }
 
 
     // ------------------------------
@@ -960,24 +1023,6 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             _stepsList = null;
             _commandsList = null;
         });
-    }
-
-
-    private void DeleteSelectedStep(SerializedProperty stepsProp)
-    {
-        if (stepsProp == null || !stepsProp.isArray) return;
-        if (_selectedStep < 0 || _selectedStep >= stepsProp.arraySize) return;
-
-        if (!EditorUtility.DisplayDialog("Delete Step", $"Delete Step {_selectedStep}?", "Delete", "Cancel"))
-            return;
-
-        Undo.RecordObject(targetSequence, "Delete Step");
-        stepsProp.DeleteArrayElementAtIndex(_selectedStep);
-        _selectedStep = Mathf.Clamp(_selectedStep, 0, stepsProp.arraySize - 1);
-
-        EditorUtility.SetDirty(targetSequence);
-        _stepsList = null;
-        _commandsList = null;
     }
 
     // ------------------------------
@@ -1028,8 +1073,8 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         int idx = _commandsList.index;
         if (idx < 0 || idx >= commandsProp.arraySize) return;
 
-        if (!EditorUtility.DisplayDialog("Delete Command", $"Delete Command {idx}?", "Delete", "Cancel"))
-            return;
+        // if (!EditorUtility.DisplayDialog("Delete Command", $"Delete Command {idx}?", "Delete", "Cancel"))
+        //     return;
 
         string commandsPath = commandsProp.propertyPath;
 
@@ -1318,11 +1363,23 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         var e = Event.current;
         if (e == null || e.type != EventType.KeyDown) return;
 
-        // 텍스트 필드 편집 중엔 Unity 기본 Ctrl+C/V를 존중
+        // 텍스트 편집 중엔 Delete를 빼앗지 않음
         if (EditorGUIUtility.editingTextField) return;
 
-        bool mod = e.control || e.command; // Win/Linux: Ctrl, Mac: Cmd
-        if (!mod) return;
+        bool mod = e.control || e.command;
+
+        // ----- Delete / Backspace : delete selected command -----
+        if (!mod && (e.keyCode == KeyCode.Delete))
+        {
+            // Command 삭제 우선
+            int idx = _commandsList.index;
+            if (idx >= 0 && idx < commandsProp.arraySize)
+            {
+                DeleteSelectedCommand(commandsProp);
+                e.Use();
+            }
+            return;
+        }
 
         // ----- Ctrl/Cmd + C -----
         if (e.keyCode == KeyCode.C)
