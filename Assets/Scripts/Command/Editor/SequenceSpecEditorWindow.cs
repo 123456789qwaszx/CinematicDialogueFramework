@@ -46,6 +46,10 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     private float _nodesW;
     private float _stepsW;
 
+// --- Default IDs for newly created commands ---
+    [SerializeField] private bool _autoFillIdsOnAdd = true;
+    [SerializeField] private string _defaultScreenId = "";
+    [SerializeField] private string _defaultWidgetId = "";
 
     // ------------------------------
     // Polymorphic Command Support
@@ -66,7 +70,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             .ToList();
     }
 
-    private void DelayModify(string undoLabel, Action<SerializedObject> action)
+    private void DelayModify(string undoLabel, Action<SerializedObject> action, bool forceRebuild = false)
     {
         EditorApplication.delayCall += () =>
         {
@@ -82,7 +86,10 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             so.ApplyModifiedProperties();
             EditorUtility.SetDirty(targetSequence);
 
-            RebuildIfNeeded(force: true);
+            // ✅ 기본은 리빌드 안 함(폴드아웃/선택 안정)
+            if (forceRebuild)
+                RebuildIfNeeded(force: true);
+
             Repaint();
         };
     }
@@ -174,8 +181,15 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         using (new EditorGUILayout.VerticalScope("box"))
         {
             EditorGUILayout.LabelField("sequence", EditorStyles.boldLabel);
-
             EditorGUILayout.PropertyField(_sequenceKeyProp, new GUIContent("sequenceKey"));
+            // ---- Defaults for new commands ----
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                _autoFillIdsOnAdd =
+                    EditorGUILayout.ToggleLeft("Auto-fill IDs on Add", _autoFillIdsOnAdd, GUILayout.Width(150));
+                _defaultScreenId = EditorGUILayout.TextField("ScreenId", _defaultScreenId);
+                _defaultWidgetId = EditorGUILayout.TextField("WidgetId", _defaultWidgetId);
+            }
 
             int nodeCount = _nodesProp != null ? _nodesProp.arraySize : 0;
             EditorGUILayout.LabelField($"Nodes: {nodeCount}");
@@ -304,12 +318,12 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         }
 
         EditorGUILayout.Space(6);
-        
+
         // Gate
         var gateProp = stepProp.FindPropertyRelative("gate");
         if (gateProp != null)
         {
-            AutoExpandOnce(gateProp);
+            AutoSetExpandedOnce(gateProp, expanded: true);
             EditorGUILayout.PropertyField(gateProp, new GUIContent("Gate(after this step)"), includeChildren: true);
 
             if (IsStructDefault(gateProp))
@@ -685,8 +699,8 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                     menu.AddItem(new GUIContent("Duplicate Step (Below)"), false, () =>
                     {
                         int nodeIndex = _selectedNode;
-                        int srcIndex  = index;
-                        int insertAt  = index + 1;
+                        int srcIndex = index;
+                        int insertAt = index + 1;
 
                         DelayModify("Duplicate Step", so =>
                         {
@@ -700,7 +714,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                             if (srcIndex < 0 || srcIndex >= node.steps.Count) return;
 
                             insertAt = Mathf.Clamp(insertAt, 0, node.steps.Count);
-                            node.steps.Insert(insertAt, CloneStepDeep(node.steps[srcIndex]));  // ✅ deep copy
+                            node.steps.Insert(insertAt, CloneStepDeep(node.steps[srcIndex])); // ✅ deep copy
 
                             _selectedStep = insertAt;
                             _stepsList = null;
@@ -725,7 +739,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                             node.steps ??= new List<StepSpec>();
 
                             insertAt = Mathf.Clamp(insertAt, 0, node.steps.Count);
-                            node.steps.Insert(insertAt, CreateBlankStep());   // ✅ new list 보장
+                            node.steps.Insert(insertAt, CreateBlankStep()); // ✅ new list 보장
 
                             _selectedStep = insertAt;
                             _stepsList = null;
@@ -832,6 +846,8 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                     }
                     else
                     {
+                        var foldouts = SnapshotCommandFoldouts(commandsProp);
+
                         foreach (var t in _cachedCommandTypes)
                         {
                             menu.AddItem(new GUIContent($"Add Command/{t.Name}"), false, () =>
@@ -841,12 +857,34 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                                     var fresh = so.FindProperty(propPath);
                                     if (fresh == null || !fresh.isArray) return;
 
-                                    int idx = fresh.arraySize;
-                                    fresh.arraySize++;
-                                    var el = fresh.GetArrayElementAtIndex(idx);
-                                    el.managedReferenceValue = Activator.CreateInstance(t);
+                                    int insertAt = fresh.arraySize;
+                                    if (_commandsList != null && _commandsList.index >= 0 && _commandsList.index < fresh.arraySize)
+                                        insertAt = _commandsList.index + 1;
 
-                                    if (_commandsList != null) _commandsList.index = idx;
+                                    insertAt = Mathf.Clamp(insertAt, 0, fresh.arraySize);
+
+                                    SerializedProperty el;
+
+                                    if (insertAt >= fresh.arraySize)
+                                    {
+                                        int idx = fresh.arraySize;
+                                        fresh.arraySize++;
+                                        el = fresh.GetArrayElementAtIndex(idx);
+                                    }
+                                    else
+                                    {
+                                        fresh.InsertArrayElementAtIndex(insertAt);
+                                        el = fresh.GetArrayElementAtIndex(insertAt);
+                                    }
+
+                                    el.managedReferenceValue = CreateCommandInstance(t);
+
+                                    // 여기서 newId를 얻어서 “새로 만든 것만 접기”
+                                    long newId = el.managedReferenceId;
+                                    RestoreCommandFoldouts(fresh, foldouts, newId);
+
+                                    _pendingCommandIndex = insertAt;
+                                    _commandsList = null;
                                 });
                             });
                         }
@@ -881,8 +919,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
             var label = new GUIContent(SummarizeCommand(element, index));
 
-            AutoExpandOnce(element); // 네가 만든 1회 확장 유지
-
+            AutoSetExpandedOnce(element, expanded: false);
             EditorGUI.PropertyField(rect, element, label, includeChildren: true);
         };
 
@@ -970,7 +1007,6 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     private void AddStep(SerializedProperty stepsProp)
     {
         int nodeIndex = _selectedNode;
-        int srcStepIndex = _selectedStep;
 
         DelayModify("Add Step", so =>
         {
@@ -981,19 +1017,10 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             var node = seq.nodes[nodeIndex];
             node.steps ??= new List<StepSpec>();
 
-            // ✅ 항상 맨 아래에 추가
+            // Always append a blank step at the end
             int insertAt = node.steps.Count;
+            node.steps.Insert(insertAt, CreateBlankStep());
 
-            // ✅ 선택된 Step을 기준으로 Deep Clone (없으면 blank)
-            StepSpec newStep;
-            if (srcStepIndex >= 0 && srcStepIndex < node.steps.Count)
-                newStep = CloneStepDeep(node.steps[srcStepIndex]);
-            else
-                newStep = CreateBlankStep();
-
-            node.steps.Insert(insertAt, newStep);
-
-            // ✅ 새로 만든 Step을 선택 상태로
             _selectedStep = insertAt;
 
             _stepsList = null;
@@ -1050,7 +1077,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                     DelayModify("Add Command", so =>
                     {
                         var fresh = so.FindProperty(propPath);
-                        AddManagedRefCommand(fresh, t);
+                        AddManagedRefCommand(fresh, () => CreateCommandInstance(t));
                     });
                 });
             }
@@ -1081,7 +1108,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         });
     }
 
-    private static void AddManagedRefCommand(SerializedProperty commandsProp, Type concreteType)
+    private void AddManagedRefCommand(SerializedProperty commandsProp, Func<CommandSpecBase> factory)
     {
         if (commandsProp == null || !commandsProp.isArray) return;
 
@@ -1089,7 +1116,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         commandsProp.arraySize++;
 
         var element = commandsProp.GetArrayElementAtIndex(idx);
-        element.managedReferenceValue = Activator.CreateInstance(concreteType);
+        element.managedReferenceValue = factory?.Invoke();
     }
 
     private static bool IsSerializeReferenceCommandList(SerializedProperty commandsProp)
@@ -1289,168 +1316,240 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         if (_autoExpandedOnce.Add(key))
             prop.isExpanded = true; // ✅ 처음 본 순간에만 펼침
     }
-    
+
+    private void AutoSetExpandedOnce(SerializedProperty prop, bool expanded)
+    {
+        if (prop == null) return;
+
+        string key = prop.propertyPath;
+        if (_autoExpandedOnce.Add(key))
+            prop.isExpanded = expanded; // 처음 만났을 때만 적용
+    }
+
     // ------------------------------
 // Command Copy/Paste (SerializeReference Clipboard)
 // ------------------------------
-private const string CommandClipboardPrefix = "CPS_CMD_SPEC::";
+    private const string CommandClipboardPrefix = "CPS_CMD_SPEC::";
 
-[Serializable]
-private sealed class CommandClipboardBox : ScriptableObject
-{
-    [SerializeReference] public CommandSpecBase spec;
-}
-
-private static void CopyCommandToClipboard(CommandSpecBase spec)
-{
-    if (spec == null) return;
-
-    var box = ScriptableObject.CreateInstance<CommandClipboardBox>();
-    try
+    [Serializable]
+    private sealed class CommandClipboardBox : ScriptableObject
     {
-        box.spec = spec;
-        string json = EditorJsonUtility.ToJson(box);
-        EditorGUIUtility.systemCopyBuffer = CommandClipboardPrefix + json;
+        [SerializeReference] public CommandSpecBase spec;
     }
-    finally
+
+    private static void CopyCommandToClipboard(CommandSpecBase spec)
     {
-        DestroyImmediate(box);
-    }
-}
+        if (spec == null) return;
 
-private static bool TryGetClipboardJson(out string json)
-{
-    json = null;
-
-    string buf = EditorGUIUtility.systemCopyBuffer;
-    if (string.IsNullOrEmpty(buf)) return false;
-    if (!buf.StartsWith(CommandClipboardPrefix, StringComparison.Ordinal)) return false;
-
-    json = buf.Substring(CommandClipboardPrefix.Length);
-    return !string.IsNullOrEmpty(json);
-}
-
-private static CommandSpecBase CreateCommandFromJson(string json)
-{
-    if (string.IsNullOrEmpty(json)) return null;
-
-    var box = ScriptableObject.CreateInstance<CommandClipboardBox>();
-    try
-    {
-        EditorJsonUtility.FromJsonOverwrite(json, box);
-        return box.spec; // 새 인스턴스(다형성 유지)
-    }
-    finally
-    {
-        DestroyImmediate(box);
-    }
-}
-
-private void HandleCommandShortcuts(SerializedProperty commandsProp)
-{
-    if (commandsProp == null || !commandsProp.isArray) return;
-    if (_commandsList == null) return;
-
-    var e = Event.current;
-    if (e == null || e.type != EventType.KeyDown) return;
-
-    // 텍스트 필드 편집 중엔 Unity 기본 Ctrl+C/V를 존중
-    if (EditorGUIUtility.editingTextField) return;
-
-    bool mod = e.control || e.command; // Win/Linux: Ctrl, Mac: Cmd
-    if (!mod) return;
-
-    // ----- Ctrl/Cmd + C -----
-    if (e.keyCode == KeyCode.C)
-    {
-        int idx = _commandsList.index;
-        if (idx >= 0 && idx < commandsProp.arraySize)
+        var box = ScriptableObject.CreateInstance<CommandClipboardBox>();
+        try
         {
-            var el = commandsProp.GetArrayElementAtIndex(idx);
-            if (el != null && el.propertyType == SerializedPropertyType.ManagedReference)
-            {
-                CopyCommandToClipboard(el.managedReferenceValue as CommandSpecBase);
-                e.Use();
-            }
+            box.spec = spec;
+            string json = EditorJsonUtility.ToJson(box);
+            EditorGUIUtility.systemCopyBuffer = CommandClipboardPrefix + json;
         }
-        return;
+        finally
+        {
+            DestroyImmediate(box);
+        }
     }
 
-    // ----- Ctrl/Cmd + V -----
-    if (e.keyCode == KeyCode.V)
+    private static bool TryGetClipboardJson(out string json)
     {
-        if (!TryGetClipboardJson(out string json))
-            return;
+        json = null;
 
-        // 붙여넣기 위치: 선택 커맨드 "다음" (선택 없으면 맨 끝)
-        int insertAt = commandsProp.arraySize;
-        int sel = _commandsList.index;
-        if (sel >= 0 && sel < commandsProp.arraySize)
-            insertAt = sel + 1;
+        string buf = EditorGUIUtility.systemCopyBuffer;
+        if (string.IsNullOrEmpty(buf)) return false;
+        if (!buf.StartsWith(CommandClipboardPrefix, StringComparison.Ordinal)) return false;
 
-        string propPath = commandsProp.propertyPath;
-
-        DelayModify("Paste Command", so =>
-        {
-            var fresh = so.FindProperty(propPath);
-            if (fresh == null || !fresh.isArray) return;
-
-            insertAt = Mathf.Clamp(insertAt, 0, fresh.arraySize);
-
-            fresh.InsertArrayElementAtIndex(insertAt);
-            var pastedEl = fresh.GetArrayElementAtIndex(insertAt);
-
-            // 매 Paste마다 새 인스턴스를 만들어 넣기(연속 붙여넣기 시 동일 참조 방지)
-            pastedEl.managedReferenceValue = CreateCommandFromJson(json);
-
-            _pendingCommandIndex = insertAt; // 새로 붙인 커맨드 선택 유지
-            _commandsList = null;            // 리빌드 유도
-        });
-
-        e.Use();
-        return;
+        json = buf.Substring(CommandClipboardPrefix.Length);
+        return !string.IsNullOrEmpty(json);
     }
 
-    // (선택) Ctrl/Cmd + D = Duplicate (현재 선택 커맨드 복제)
-    if (e.keyCode == KeyCode.D)
+    private static CommandSpecBase CreateCommandFromJson(string json)
     {
-        int idx = _commandsList.index;
-        if (idx >= 0 && idx < commandsProp.arraySize)
+        if (string.IsNullOrEmpty(json)) return null;
+
+        var box = ScriptableObject.CreateInstance<CommandClipboardBox>();
+        try
         {
-            var el = commandsProp.GetArrayElementAtIndex(idx);
-            if (el != null && el.propertyType == SerializedPropertyType.ManagedReference)
+            EditorJsonUtility.FromJsonOverwrite(json, box);
+            return box.spec; // 새 인스턴스(다형성 유지)
+        }
+        finally
+        {
+            DestroyImmediate(box);
+        }
+    }
+
+    private void HandleCommandShortcuts(SerializedProperty commandsProp)
+    {
+        if (commandsProp == null || !commandsProp.isArray) return;
+        if (_commandsList == null) return;
+
+        var e = Event.current;
+        if (e == null || e.type != EventType.KeyDown) return;
+
+        // 텍스트 필드 편집 중엔 Unity 기본 Ctrl+C/V를 존중
+        if (EditorGUIUtility.editingTextField) return;
+
+        bool mod = e.control || e.command; // Win/Linux: Ctrl, Mac: Cmd
+        if (!mod) return;
+
+        // ----- Ctrl/Cmd + C -----
+        if (e.keyCode == KeyCode.C)
+        {
+            int idx = _commandsList.index;
+            if (idx >= 0 && idx < commandsProp.arraySize)
             {
-                // 내부적으로 복사-붙여넣기 동작
-                CopyCommandToClipboard(el.managedReferenceValue as CommandSpecBase);
-
-                // 바로 Paste 트리거
-                // (키 이벤트 재사용하지 말고 로직만 호출)
-                if (TryGetClipboardJson(out string json))
+                var el = commandsProp.GetArrayElementAtIndex(idx);
+                if (el != null && el.propertyType == SerializedPropertyType.ManagedReference)
                 {
-                    int insertAt = idx + 1;
-                    string propPath = commandsProp.propertyPath;
-
-                    DelayModify("Duplicate Command", so =>
-                    {
-                        var fresh = so.FindProperty(propPath);
-                        if (fresh == null || !fresh.isArray) return;
-
-                        insertAt = Mathf.Clamp(insertAt, 0, fresh.arraySize);
-                        fresh.InsertArrayElementAtIndex(insertAt);
-
-                        var pastedEl = fresh.GetArrayElementAtIndex(insertAt);
-                        pastedEl.managedReferenceValue = CreateCommandFromJson(json);
-
-                        _pendingCommandIndex = insertAt;
-                        _commandsList = null;
-                    });
-
+                    CopyCommandToClipboard(el.managedReferenceValue as CommandSpecBase);
                     e.Use();
+                }
+            }
+
+            return;
+        }
+
+        // ----- Ctrl/Cmd + V -----
+        if (e.keyCode == KeyCode.V)
+        {
+            if (!TryGetClipboardJson(out string json))
+                return;
+
+            // 붙여넣기 위치: 선택 커맨드 "다음" (선택 없으면 맨 끝)
+            int insertAt = commandsProp.arraySize;
+            int sel = _commandsList.index;
+            if (sel >= 0 && sel < commandsProp.arraySize)
+                insertAt = sel + 1;
+
+            string propPath = commandsProp.propertyPath;
+
+            DelayModify("Paste Command", so =>
+            {
+                var fresh = so.FindProperty(propPath);
+                if (fresh == null || !fresh.isArray) return;
+
+                insertAt = Mathf.Clamp(insertAt, 0, fresh.arraySize);
+
+                fresh.InsertArrayElementAtIndex(insertAt);
+                var pastedEl = fresh.GetArrayElementAtIndex(insertAt);
+
+                // 매 Paste마다 새 인스턴스를 만들어 넣기(연속 붙여넣기 시 동일 참조 방지)
+                pastedEl.managedReferenceValue = CreateCommandFromJson(json);
+
+                _pendingCommandIndex = insertAt; // 새로 붙인 커맨드 선택 유지
+                _commandsList = null; // 리빌드 유도
+            });
+
+            e.Use();
+            return;
+        }
+
+        // (선택) Ctrl/Cmd + D = Duplicate (현재 선택 커맨드 복제)
+        if (e.keyCode == KeyCode.D)
+        {
+            int idx = _commandsList.index;
+            if (idx >= 0 && idx < commandsProp.arraySize)
+            {
+                var el = commandsProp.GetArrayElementAtIndex(idx);
+                if (el != null && el.propertyType == SerializedPropertyType.ManagedReference)
+                {
+                    // 내부적으로 복사-붙여넣기 동작
+                    CopyCommandToClipboard(el.managedReferenceValue as CommandSpecBase);
+
+                    // 바로 Paste 트리거
+                    // (키 이벤트 재사용하지 말고 로직만 호출)
+                    if (TryGetClipboardJson(out string json))
+                    {
+                        int insertAt = idx + 1;
+                        string propPath = commandsProp.propertyPath;
+
+                        DelayModify("Duplicate Command", so =>
+                        {
+                            var fresh = so.FindProperty(propPath);
+                            if (fresh == null || !fresh.isArray) return;
+
+                            insertAt = Mathf.Clamp(insertAt, 0, fresh.arraySize);
+                            fresh.InsertArrayElementAtIndex(insertAt);
+
+                            var pastedEl = fresh.GetArrayElementAtIndex(insertAt);
+                            pastedEl.managedReferenceValue = CreateCommandFromJson(json);
+
+                            _pendingCommandIndex = insertAt;
+                            _commandsList = null;
+                        });
+
+                        e.Use();
+                    }
                 }
             }
         }
     }
-}
+
+    private CommandSpecBase CreateCommandInstance(Type t)
+    {
+        var inst = (CommandSpecBase)Activator.CreateInstance(t);
+
+        if (_autoFillIdsOnAdd && inst != null)
+        {
+            // 빈 값이면 덮어쓰지 않음(원하면 무조건 덮어쓰게 바꿔도 됨)
+            if (!string.IsNullOrWhiteSpace(_defaultScreenId))
+                inst.screenId = _defaultScreenId;
+
+            if (!string.IsNullOrWhiteSpace(_defaultWidgetId))
+                inst.widgetId = _defaultWidgetId;
+        }
+
+        return inst;
+    }
+
+    private Dictionary<long, bool> SnapshotCommandFoldouts(SerializedProperty commandsProp)
+    {
+        var map = new Dictionary<long, bool>();
+
+        if (commandsProp == null || !commandsProp.isArray) return map;
+
+        for (int i = 0; i < commandsProp.arraySize; i++)
+        {
+            var el = commandsProp.GetArrayElementAtIndex(i);
+            if (el == null) continue;
+            if (el.propertyType != SerializedPropertyType.ManagedReference) continue;
+
+            // Stable id for SerializeReference instances
+            long id = el.managedReferenceId;
+            map[id] = el.isExpanded;
+        }
+
+        return map;
+    }
+
+    private void RestoreCommandFoldouts(SerializedProperty commandsProp, Dictionary<long, bool> map,
+        long newIdToCollapse)
+    {
+        if (commandsProp == null || !commandsProp.isArray) return;
+
+        for (int i = 0; i < commandsProp.arraySize; i++)
+        {
+            var el = commandsProp.GetArrayElementAtIndex(i);
+            if (el == null) continue;
+            if (el.propertyType != SerializedPropertyType.ManagedReference) continue;
+
+            long id = el.managedReferenceId;
+
+            if (id == newIdToCollapse)
+            {
+                el.isExpanded = false; // ✅ only the newly created one
+                continue;
+            }
+
+            if (map != null && map.TryGetValue(id, out bool expanded))
+                el.isExpanded = expanded; // ✅ restore others
+        }
+    }
+
 
 #if UNITY_EDITOR
     private static StepSpec CreateBlankStep()
@@ -1461,6 +1560,7 @@ private void HandleCommandShortcuts(SerializedProperty commandsProp)
             commands = new List<CommandSpecBase>()
         };
     }
+
     private static NodeSpec CreateBlankNode()
     {
         return new NodeSpec
@@ -1521,7 +1621,7 @@ private void HandleCommandShortcuts(SerializedProperty commandsProp)
 
         return clone;
     }
-    
+
 #endif
 
     // ------------------------------
