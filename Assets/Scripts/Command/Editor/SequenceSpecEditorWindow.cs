@@ -1485,7 +1485,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                 inst.screenId = _defaultScreenId;
 
             if (!string.IsNullOrWhiteSpace(_defaultWidgetId))
-                inst.widgetId = _defaultWidgetId;
+                inst.widgetRefKey = _defaultWidgetId;
         }
 
         return inst;
