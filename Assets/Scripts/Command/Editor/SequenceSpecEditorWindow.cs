@@ -571,23 +571,23 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
         HandleCommandShortcuts(commandsProp);
 
-        using (new EditorGUILayout.HorizontalScope())
-        {
-            GUILayout.FlexibleSpace();
-
-            bool canDelete =
-                commandsProp.arraySize > 0 &&
-                _commandsList != null &&
-                _hasSelectedCommand && // 명시적으로 선택된 커맨드가 있을 때만
-                _commandsList.index >= 0 &&
-                _commandsList.index < commandsProp.arraySize;
-
-            using (new EditorGUI.DisabledScope(!canDelete))
-            {
-                if (GUILayout.Button("Delete", GUILayout.Width(60), GUILayout.Height(24)))
-                    DeleteSelectedCommand(commandsProp);
-            }
-        }
+        // using (new EditorGUILayout.HorizontalScope())
+        // {
+        //     GUILayout.FlexibleSpace();
+        //
+        //     bool canDelete =
+        //         commandsProp.arraySize > 0 &&
+        //         _commandsList != null &&
+        //         _hasSelectedCommand && // 명시적으로 선택된 커맨드가 있을 때만
+        //         _commandsList.index >= 0 &&
+        //         _commandsList.index < commandsProp.arraySize;
+        //
+        //     using (new EditorGUI.DisabledScope(!canDelete))
+        //     {
+        //         if (GUILayout.Button("Delete", GUILayout.Width(60), GUILayout.Height(24)))
+        //             DeleteSelectedCommand(commandsProp);
+        //     }
+        // }
     }
 
     // ------------------------------
@@ -1049,43 +1049,33 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         {
             if (index < 0 || index >= commandsProp.arraySize) return;
 
-            if (Event.current.type == EventType.Repaint)
-                _commandItemRects.Add(rect);
-
             var e = Event.current;
 
-            // 1) 우클릭은 '요소 전체 영역'에서 먼저 가로챈다 (헤더+바디 포함)
+            // ✅ 1) 우클릭은 '요소 전체 영역'에서 가로챔
             if (e.type == EventType.ContextClick && rect.Contains(e.mousePosition))
             {
                 if (_commandsList != null)
-                {
                     _commandsList.index = index; // 우클릭한 커맨드를 선택 상태로
-                    _hasSelectedCommand =
-                        _commandsList.index >= 0 &&
-                        _commandsList.index < commandsProp.arraySize;
-                }
-
                 Repaint();
 
-                // 전체 타입 목록 확보 (기존 CacheCommandTypes 이용)
                 CacheCommandTypes();
 
-                // 캡처용 지역 변수
                 int clickedIndex = index;
                 string commandsPath = commandsProp.propertyPath;
 
-                // 1) 먼저 도메인 훅(SequenceEditorMenuHooks)에게 메뉴를 맡겨본다
+                // 1단계: 도메인 Hook에게 메뉴 구성 맡기면서
+                //        Delete Command 를 주입할 수 있는 extendMenu 전달
                 bool handled = SequenceEditorMenuHooks.TryShowCommandMenu(
                     _cachedCommandTypes,
                     t =>
                     {
-                        // ▶ 도메인 메뉴에서 타입 하나 선택했을 때 호출되는 콜백
+                        // ▶ 도메인 메뉴에서 타입 하나 선택했을 때 호출
                         DelayModify("Add Command", so =>
                         {
                             var fresh = so.FindProperty(commandsPath);
                             if (fresh == null || !fresh.isArray) return;
 
-                            // 우클릭한 커맨드 바로 '아래'에 삽입
+                            // 우클릭한 커맨드 바로 아래에 삽입
                             int insertAt = Mathf.Clamp(clickedIndex + 1, 0, fresh.arraySize);
 
                             fresh.InsertArrayElementAtIndex(insertAt);
@@ -1094,13 +1084,31 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
                             _pendingCommandIndex = insertAt;
                             _commandsList = null;
-                            //_scrollToNewCommand = true;
+
+                            // 🔹 우클릭 추가는 "주변에서만 작업"이니
+                            //    스크롤을 맨 아래로 내리지 않는다!
+                            // _scrollToNewCommand = true;   // ❌ 제거
+                        });
+                    },
+                    menu =>
+                    {
+                        // 🔹 공통 Delete 항목 주입
+                        menu.AddSeparator("");
+                        menu.AddItem(new GUIContent("Delete Command"), false, () =>
+                        {
+                            DeleteArrayElementByPath("Delete Command", commandsPath, clickedIndex, after: () =>
+                            {
+                                if (_commandsList != null)
+                                    _commandsList.index = Mathf.Max(0, clickedIndex - 1);
+
+                                _commandsList = null;
+                            });
                         });
                     });
 
+                // 2단계: Hook가 처리 안 했다면(flat fallback)
                 if (!handled)
                 {
-                    // 2) 훅이 없으면 예전처럼 flat 메뉴 + Delete 로 fallback
                     var menu = new GenericMenu();
 
                     if (_cachedCommandTypes == null || _cachedCommandTypes.Count == 0)
@@ -1126,7 +1134,8 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
                                     _pendingCommandIndex = insertAt;
                                     _commandsList = null;
-                                    //_scrollToNewCommand = true;
+                                    // 여기도 우클릭 패스라 스크롤 이동 X
+                                    // _scrollToNewCommand = true;  // ❌ 제거
                                 });
                             });
                         }
@@ -1139,14 +1148,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                         DeleteArrayElementByPath("Delete Command", commandsPath, clickedIndex, after: () =>
                         {
                             if (_commandsList != null)
-                            {
-                                int newIndex = Mathf.Max(0, clickedIndex - 1);
-                                if (newIndex >= commandsProp.arraySize)
-                                    newIndex = -1;
-
-                                _commandsList.index = newIndex;
-                                _hasSelectedCommand = (newIndex >= 0);
-                            }
+                                _commandsList.index = Mathf.Max(0, clickedIndex - 1);
 
                             _commandsList = null;
                         });
@@ -1155,11 +1157,11 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                     menu.ShowAsContext();
                 }
 
-                e.Use(); // 이벤트 소비해서 기본 메뉴 막기
+                e.Use();
                 return;
             }
 
-            // ---- 여기부터는 평소 렌더 ----
+            // ---- 여기부터는 기존 렌더링 로직 유지 ----
             var element = commandsProp.GetArrayElementAtIndex(index);
 
             rect.y += 2f;
