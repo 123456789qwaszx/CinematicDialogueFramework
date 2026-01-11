@@ -42,6 +42,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     private int _pendingCommandIndex = -1; // +Command 후 선택 유지용(선택사항이지만 같이 넣자)
 
     private readonly HashSet<string> _autoExpandedOnce = new();
+    private bool _scrollToNewCommand;
 
     private float _nodesW;
     private float _stepsW;
@@ -142,6 +143,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         }
 
         _so.Update();
+        HandleGlobalCommandDeleteShortcut(); 
 
         DrawHeader();
 
@@ -177,30 +179,165 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     }
 
     private void DrawHeader()
+{
+    using (new EditorGUILayout.VerticalScope("box"))
     {
-        using (new EditorGUILayout.VerticalScope("box"))
+        EditorGUILayout.LabelField("sequence", EditorStyles.boldLabel);
+        using (new EditorGUILayout.HorizontalScope())
         {
-            EditorGUILayout.LabelField("sequence", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(_sequenceKeyProp, new GUIContent("sequenceKey"));
-            // ---- Defaults for new commands ----
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                _autoFillIdsOnAdd =
-                    EditorGUILayout.ToggleLeft("Auto-fill IDs on Add", _autoFillIdsOnAdd, GUILayout.Width(150));
-                _defaultScreenId = EditorGUILayout.TextField("ScreenId", _defaultScreenId);
-                _defaultWidgetId = EditorGUILayout.TextField("WidgetId", _defaultWidgetId);
-            }
+            GUILayout.Space(4f); // 살짝 왼쪽 여백
 
-            int nodeCount = _nodesProp != null ? _nodesProp.arraySize : 0;
-            EditorGUILayout.LabelField($"Nodes: {nodeCount}");
+            float oldLabelWidth = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = 80f; // "sequenceKey" 라벨 폭 약간만
 
-            if (string.IsNullOrWhiteSpace(_sequenceKeyProp.stringValue))
-                EditorGUILayout.HelpBox("sequenceKey is empty. Route resolution will fail.", MessageType.Warning);
+            EditorGUILayout.PropertyField(
+                _sequenceKeyProp,
+                new GUIContent("sequenceKey"),
+                GUILayout.MaxWidth(300f) // ✅ 여기서 길이 제한 (원하면 240~300 사이로 조절)
+            );
 
-            if (nodeCount == 0)
-                EditorGUILayout.HelpBox("No nodes. Use 'Add Node'.", MessageType.Warning);
+            EditorGUIUtility.labelWidth = oldLabelWidth;
+
+            GUILayout.FlexibleSpace(); // 나머지 오른쪽은 비워두기
         }
+        
+        EditorGUILayout.Space(4f);
+        // 🔹 여기 한 줄에 전부 배치
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            // 1) 왼쪽: Auto-fill 토글
+            _autoFillIdsOnAdd = EditorGUILayout.ToggleLeft(
+                "Auto-fill",
+                _autoFillIdsOnAdd,
+                GUILayout.Width(80f)
+            );
+
+            GUILayout.Space(8f);
+
+            // 2) ScreenId 블록 (Label + TextField)
+            EditorGUILayout.LabelField("ScreenId", GUILayout.Width(60f));
+            _defaultScreenId = EditorGUILayout.TextField(
+                _defaultScreenId,
+                GUILayout.Width(160f)           // ✅ 오른쪽 끝까지 안 가도록 고정 폭
+            );
+
+            GUILayout.Space(16f);               // ✅ Screen / Widget 사이 간격 넉넉하게
+
+            // 3) WidgetRefKey 블록 (Label + TextField)
+            EditorGUILayout.LabelField("WidgetRoleKey", GUILayout.Width(90f));
+            _defaultWidgetId = EditorGUILayout.TextField(
+                _defaultWidgetId,
+                GUILayout.Width(160f)
+            );
+
+            // 4) 오른쪽으로 쭉 밀기
+            GUILayout.FlexibleSpace();
+
+            // 5) 맨 오른쪽: Apply 버튼
+            using (new EditorGUI.DisabledScope(!CanApplyIdsToCurrentStep()))
+            {
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Apply IDs",
+                            "Apply ScreenId / widgetRoleKey above to all commands in the current step."
+                        ),
+                        GUILayout.Width(100f)))
+                {
+                    ApplyDefaultIdsToCurrentStepCommands();
+                }
+            }
+        }
+
+        int nodeCount = _nodesProp != null ? _nodesProp.arraySize : 0;
+        EditorGUILayout.LabelField($"Nodes: {nodeCount}");
+
+        if (string.IsNullOrWhiteSpace(_sequenceKeyProp.stringValue))
+            EditorGUILayout.HelpBox("sequenceKey is empty. Route resolution will fail.", MessageType.Warning);
+
+        if (nodeCount == 0)
+            EditorGUILayout.HelpBox("No nodes. Use 'Add Node'.", MessageType.Warning);
     }
+}
+    
+    private bool CanApplyIdsToCurrentStep()
+    {
+        if (_nodesProp == null) return false;
+        if (_selectedNode < 0 || _selectedNode >= _nodesProp.arraySize) return false;
+
+        var nodeProp = _nodesProp.GetArrayElementAtIndex(_selectedNode);
+        if (nodeProp == null) return false;
+
+        var stepsProp = nodeProp.FindPropertyRelative("steps");
+        if (stepsProp == null || !stepsProp.isArray) return false;
+        if (_selectedStep < 0 || _selectedStep >= stepsProp.arraySize) return false;
+
+        var stepProp = stepsProp.GetArrayElementAtIndex(_selectedStep);
+        if (stepProp == null) return false;
+
+        var commandsProp = stepProp.FindPropertyRelative("commands");
+        if (commandsProp == null || !commandsProp.isArray) return false;
+
+        // 커맨드가 하나도 없으면 굳이 버튼 활성화 안 해도 됨
+        if (commandsProp.arraySize == 0) return false;
+
+        // 둘 다 비어 있으면 적용해봐야 의미가 없으니까 비활성
+        if (string.IsNullOrWhiteSpace(_defaultScreenId) &&
+            string.IsNullOrWhiteSpace(_defaultWidgetId))
+            return false;
+
+        return true;
+    }
+    
+    private void ApplyDefaultIdsToCurrentStepCommands()
+    {
+        if (_nodesProp == null) return;
+        if (_selectedNode < 0 || _selectedNode >= _nodesProp.arraySize) return;
+        if (_selectedStep < 0) return;
+
+        int nodeIndex = _selectedNode;
+        int stepIndex = _selectedStep;
+
+        string screenId     = _defaultScreenId  ?? string.Empty;
+        string widgetRoleKey = _defaultWidgetId ?? string.Empty;
+
+        DelayModify("Apply IDs to Step Commands", so =>
+        {
+            var nodes = so.FindProperty("nodes");
+            if (nodes == null || !nodes.isArray) return;
+            if (nodeIndex < 0 || nodeIndex >= nodes.arraySize) return;
+
+            var nodeProp = nodes.GetArrayElementAtIndex(nodeIndex);
+            if (nodeProp == null) return;
+
+            var stepsProp = nodeProp.FindPropertyRelative("steps");
+            if (stepsProp == null || !stepsProp.isArray) return;
+            if (stepIndex < 0 || stepIndex >= stepsProp.arraySize) return;
+
+            // ✅ 여기서 "현재 선택된 Step 하나"만 잡는다
+            var stepProp = stepsProp.GetArrayElementAtIndex(stepIndex);
+            if (stepProp == null) return;
+
+            var commandsProp = stepProp.FindPropertyRelative("commands");
+            if (commandsProp == null || !commandsProp.isArray) return;
+
+            for (int i = 0; i < commandsProp.arraySize; i++)
+            {
+                var cmdProp = commandsProp.GetArrayElementAtIndex(i);
+                if (cmdProp == null) continue;
+                if (cmdProp.propertyType != SerializedPropertyType.ManagedReference) continue;
+
+                var screenProp = cmdProp.FindPropertyRelative("screenId");
+                var widgetProp = cmdProp.FindPropertyRelative("widgetRoleKey");
+
+                if (screenProp != null)
+                    screenProp.stringValue = screenId;
+
+                if (widgetProp != null)
+                    widgetProp.stringValue = widgetRoleKey;
+            }
+        });
+    }
+
 
     private void DrawNodesPanel()
     {
@@ -291,13 +428,75 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                     return;
                 }
 
-                using (new EditorGUI.DisabledScope(_isDraggingSteps))
-                using (var scroll = new EditorGUILayout.ScrollViewScope(_rightScroll))
-                {
-                    _rightScroll = scroll.scrollPosition;
+                var stepProp = stepsProp.GetArrayElementAtIndex(_selectedStep);
+                var commandsProp = stepProp.FindPropertyRelative("commands");
 
-                    var stepProp = stepsProp.GetArrayElementAtIndex(_selectedStep);
-                    DrawStepDetail(stepProp);
+                using (new EditorGUI.DisabledScope(_isDraggingSteps))
+                {
+                    // 위쪽: 스크롤 영역(Commands 포함)
+                    using (var scroll = new EditorGUILayout.ScrollViewScope(_rightScroll, GUILayout.ExpandHeight(true)))
+                    {
+                        _rightScroll = scroll.scrollPosition;
+                        DrawStepDetail(stepProp);
+                        
+                        if (_scrollToNewCommand && Event.current.type == EventType.Repaint)
+                        {
+                            _rightScroll.y = float.MaxValue; // 사실상 맨 아래로
+                            _scrollToNewCommand = false;
+                        }
+                    }
+
+
+                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Height(42f)))
+                    {
+                        // 세로로는 전체적으로 아래로 붙이기
+                        GUILayout.FlexibleSpace();
+
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            // 왼쪽 여백
+                            GUILayout.Space(4f);
+
+                            bool validCommands = (commandsProp != null && commandsProp.isArray);
+                            bool hasCommands = validCommands && commandsProp.arraySize > 0;
+
+                            // 왼쪽: + Command (위쪽 기준)
+                            using (new EditorGUI.DisabledScope(!validCommands))
+                            {
+                                if (GUILayout.Button("+ Command", GUILayout.Width(90), GUILayout.Height(28)))
+                                    AddCommand(commandsProp);
+                            }
+
+                            // 가운데는 유연한 빈 공간
+                            GUILayout.FlexibleSpace();
+
+                            // 오른쪽: 아래로 더 내려간 Expand / Collapse
+                            using (new EditorGUILayout.VerticalScope(GUILayout.Width(190f)))
+                            {
+                                GUILayout.Space(4f);
+                                GUILayout.FlexibleSpace(); // 이 영역 안에서 아래로 밀어내기
+
+                                using (new EditorGUI.DisabledScope(!hasCommands))
+                                using (new EditorGUILayout.HorizontalScope())
+                                {
+                                    if (GUILayout.Button("Expand All", GUILayout.Width(90), GUILayout.Height(24)))
+                                        SetAllCommandFoldouts(commandsProp, true);
+
+                                    GUILayout.Space(2f);
+
+                                    if (GUILayout.Button("Collapse All", GUILayout.Width(90), GUILayout.Height(24)))
+                                        SetAllCommandFoldouts(commandsProp, false);
+                                }
+
+                                GUILayout.Space(2f); // 바닥과 살짝 띄우기 (원하면 조절)
+                            }
+
+                            // 오른쪽 여백
+                            GUILayout.Space(0f);
+                        }
+
+                        GUILayout.Space(0f); // helpBox 바닥과 전체 줄 사이 여백(옵션)
+                    }
                 }
             }
         }
@@ -307,12 +506,12 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     {
         EditorGUILayout.LabelField($"Step {_selectedStep}", EditorStyles.boldLabel);
 
-        // ✅ Step Name
+        // Step Name
         var stepNameProp = stepProp.FindPropertyRelative("editorName");
         if (stepNameProp != null)
         {
             EditorGUI.BeginChangeCheck();
-            string newName = EditorGUILayout.TextField("Name", stepNameProp.stringValue ?? "");
+            string newName = EditorGUILayout.TextField("Step Label (for editor)", stepNameProp.stringValue ?? "");
             if (EditorGUI.EndChangeCheck())
                 stepNameProp.stringValue = newName;
         }
@@ -359,27 +558,26 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         }
 
         commandsProp.isExpanded = true;
-        // ✅ Commands 리스트 먼저
         EnsureCommandsList(stepProp, commandsProp);
         _commandsList?.DoLayoutList();
 
         HandleCommandShortcuts(commandsProp);
-        // ✅ Command 버튼을 리스트 아래로 이동
-        using (new EditorGUILayout.HorizontalScope())
-        {
-            if (GUILayout.Button("+ Command", GUILayout.Height(24)))
-                AddCommand(commandsProp);
-
-            GUILayout.FlexibleSpace();
-
-            using (new EditorGUI.DisabledScope(commandsProp.arraySize == 0 || _commandsList == null ||
-                                               _commandsList.index < 0 ||
-                                               _commandsList.index >= commandsProp.arraySize))
-            {
-                if (GUILayout.Button("Delete Command", GUILayout.Width(110), GUILayout.Height(24)))
-                    DeleteSelectedCommand(commandsProp); // (원하면 확인도 추가 가능)
-            }
-        }
+        // // Command 버튼을 리스트 아래로 이동
+        // using (new EditorGUILayout.HorizontalScope())
+        // {
+        //     if (GUILayout.Button("+ Command", GUILayout.Height(24)))
+        //         AddCommand(commandsProp);
+        //
+        //     GUILayout.FlexibleSpace();
+        //
+        //     using (new EditorGUI.DisabledScope(commandsProp.arraySize == 0 || _commandsList == null ||
+        //                                        _commandsList.index < 0 ||
+        //                                        _commandsList.index >= commandsProp.arraySize))
+        //     {
+        //         if (GUILayout.Button("Delete Command", GUILayout.Width(110), GUILayout.Height(24)))
+        //             DeleteSelectedCommand(commandsProp); // (원하면 확인도 추가 가능)
+        //     }
+        // }
     }
 
     // ------------------------------
@@ -387,7 +585,8 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     // ------------------------------
     private void RebuildIfNeeded(bool force)
     {
-        if (!force && _so != null && _so.targetObject == targetSequence) return;
+        if (!force && _so != null && _so.targetObject == targetSequence && _nodesList != null)
+            return;
 
         if (targetSequence == null)
         {
@@ -404,7 +603,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
         _autoExpandedOnce.Clear();
 
-        // ✅ 이전 선택값 백업
+        // 이전 선택값 백업
         int prevNode = _selectedNode;
         int prevStep = _selectedStep;
 
@@ -415,7 +614,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         int nodeCount = _nodesProp?.arraySize ?? 0;
         _selectedNode = (nodeCount <= 0) ? -1 : Mathf.Clamp(prevNode, 0, nodeCount - 1);
 
-        // ✅ Step 선택도 유지(단, 유효범위로 clamp)
+        // Step 선택도 유지(단, 유효범위로 clamp)
         if (_selectedNode >= 0)
         {
             var nodeProp = _nodesProp.GetArrayElementAtIndex(_selectedNode);
@@ -816,110 +1015,112 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             var element = commandsProp.GetArrayElementAtIndex(index);
 
             float header = EditorGUIUtility.singleLineHeight; // foldout + label 한 줄
-            float body   = GetManagedRefBodyHeight(element);  // child들만
+            float body = GetManagedRefBodyHeight(element); // child들만
             return header + body + 6f; // padding
         };
         _commandsList.drawHeaderCallback = rect => { EditorGUI.LabelField(rect, "Commands", EditorStyles.boldLabel); };
 
         _commandsList.drawElementCallback = (rect, index, isActive, isFocused) =>
-{
-    if (index < 0 || index >= commandsProp.arraySize) return;
-
-    var e = Event.current;
-
-    // ✅ 1) 우클릭은 '요소 전체 영역'에서 먼저 가로챈다 (헤더+바디 포함)
-    if (e.type == EventType.ContextClick && rect.Contains(e.mousePosition))
-    {
-        if (_commandsList != null) _commandsList.index = index;
-        Repaint();
-
-        string propPath = commandsProp.propertyPath;
-        string commandsPath = commandsProp.propertyPath; // 너 기존 변수명 유지해도 됨
-
-        ShowContextMenu(menu =>
         {
-            CacheCommandTypes();
+            if (index < 0 || index >= commandsProp.arraySize) return;
 
-            if (_cachedCommandTypes == null || _cachedCommandTypes.Count == 0)
+            var e = Event.current;
+
+            // ✅ 1) 우클릭은 '요소 전체 영역'에서 먼저 가로챈다 (헤더+바디 포함)
+            if (e.type == EventType.ContextClick && rect.Contains(e.mousePosition))
             {
-                menu.AddDisabledItem(new GUIContent("Add Command/No types found"));
-            }
-            else
-            {
-                foreach (var t in _cachedCommandTypes)
+                if (_commandsList != null) _commandsList.index = index;
+                Repaint();
+
+                string propPath = commandsProp.propertyPath;
+                string commandsPath = commandsProp.propertyPath; // 너 기존 변수명 유지해도 됨
+
+                ShowContextMenu(menu =>
                 {
-                    var foldouts = SnapshotCommandFoldouts(commandsProp);
+                    CacheCommandTypes();
 
-                    menu.AddItem(new GUIContent($"Add Command/{t.Name}"), false, () =>
+                    if (_cachedCommandTypes == null || _cachedCommandTypes.Count == 0)
                     {
-                        DelayModify("Add Command", so =>
+                        menu.AddDisabledItem(new GUIContent("Add Command/No types found"));
+                    }
+                    else
+                    {
+                        foreach (var t in _cachedCommandTypes)
                         {
-                            var fresh = so.FindProperty(propPath);
-                            if (fresh == null || !fresh.isArray) return;
+                            var foldouts = SnapshotCommandFoldouts(commandsProp);
 
-                            int insertAt = fresh.arraySize;
-                            if (_commandsList != null && _commandsList.index >= 0 && _commandsList.index < fresh.arraySize)
-                                insertAt = _commandsList.index + 1;
+                            menu.AddItem(new GUIContent($"Add Command/{t.Name}"), false, () =>
+                            {
+                                DelayModify("Add Command", so =>
+                                {
+                                    var fresh = so.FindProperty(propPath);
+                                    if (fresh == null || !fresh.isArray) return;
 
-                            fresh.InsertArrayElementAtIndex(insertAt);
-                            var el = fresh.GetArrayElementAtIndex(insertAt);
-                            el.managedReferenceValue = CreateCommandInstance(t);
+                                    int insertAt = fresh.arraySize;
+                                    if (_commandsList != null && _commandsList.index >= 0 &&
+                                        _commandsList.index < fresh.arraySize)
+                                        insertAt = _commandsList.index + 1;
 
-                            // ✅ 기존 폴드아웃 유지 + 새것만 접기
-                            RestoreCommandFoldouts(fresh, foldouts, el.managedReferenceId);
+                                    fresh.InsertArrayElementAtIndex(insertAt);
+                                    var el = fresh.GetArrayElementAtIndex(insertAt);
+                                    el.managedReferenceValue = CreateCommandInstance(t);
 
-                            _pendingCommandIndex = insertAt;
+                                    // ✅ 기존 폴드아웃 유지 + 새것만 접기
+                                    RestoreCommandFoldouts(fresh, foldouts, el.managedReferenceId);
+
+                                    _pendingCommandIndex = insertAt;
+                                    _commandsList = null;
+                                });
+                            });
+                        }
+                    }
+
+                    menu.AddSeparator("");
+
+                    menu.AddItem(new GUIContent("Delete Command"), false, () =>
+                    {
+                        // if (!EditorUtility.DisplayDialog("Delete Command", $"Delete Command {index}?", "Delete", "Cancel"))
+                        //     return;
+
+                        DeleteArrayElementByPath("Delete Command", commandsPath, index, after: () =>
+                        {
+                            if (_commandsList != null)
+                                _commandsList.index = Mathf.Max(0, index - 1);
+
                             _commandsList = null;
                         });
                     });
-                }
+                });
+
+                e.Use(); // ✅ PropertyField의 기본 메뉴를 막는다
+                return; // ✅ 더 그리면 안 됨 (그리면 기본 메뉴가 다시 먹음)
             }
 
-            menu.AddSeparator("");
+            // ---- 여기부터는 평소 렌더 ----
+            var element = commandsProp.GetArrayElementAtIndex(index);
 
-            menu.AddItem(new GUIContent("Delete Command"), false, () =>
+            rect.y += 2f;
+            rect.height -= 2f;
+
+            var label = new GUIContent(SummarizeCommand(element, index));
+
+            float lineH = EditorGUIUtility.singleLineHeight;
+            var headerRect = new Rect(rect.x, rect.y, rect.width, lineH);
+
+            var arrowRect = new Rect(headerRect.x, headerRect.y, 14f, headerRect.height);
+            element.isExpanded =
+                EditorGUI.Foldout(arrowRect, element.isExpanded, GUIContent.none, toggleOnLabelClick: false);
+
+            var labelRect = new Rect(headerRect.x + 14f, headerRect.y, headerRect.width - 14f, headerRect.height);
+            EditorGUI.LabelField(labelRect, label);
+
+            if (element.isExpanded)
             {
-                // if (!EditorUtility.DisplayDialog("Delete Command", $"Delete Command {index}?", "Delete", "Cancel"))
-                //     return;
+                var bodyRect = new Rect(rect.x, rect.y + lineH + 2f, rect.width, rect.height - lineH - 2f);
+                DrawManagedRefBody(bodyRect, element);
+            }
+        };
 
-                DeleteArrayElementByPath("Delete Command", commandsPath, index, after: () =>
-                {
-                    if (_commandsList != null)
-                        _commandsList.index = Mathf.Max(0, index - 1);
-
-                    _commandsList = null;
-                });
-            });
-        });
-
-        e.Use();     // ✅ PropertyField의 기본 메뉴를 막는다
-        return;      // ✅ 더 그리면 안 됨 (그리면 기본 메뉴가 다시 먹음)
-    }
-
-    // ---- 여기부터는 평소 렌더 ----
-    var element = commandsProp.GetArrayElementAtIndex(index);
-
-    rect.y += 2f;
-    rect.height -= 2f;
-
-    var label = new GUIContent(SummarizeCommand(element, index));
-
-    float lineH = EditorGUIUtility.singleLineHeight;
-    var headerRect = new Rect(rect.x, rect.y, rect.width, lineH);
-
-    var arrowRect = new Rect(headerRect.x, headerRect.y, 14f, headerRect.height);
-    element.isExpanded = EditorGUI.Foldout(arrowRect, element.isExpanded, GUIContent.none, toggleOnLabelClick: false);
-
-    var labelRect = new Rect(headerRect.x + 14f, headerRect.y, headerRect.width - 14f, headerRect.height);
-    EditorGUI.LabelField(labelRect, label);
-
-    if (element.isExpanded)
-    {
-        var bodyRect = new Rect(rect.x, rect.y + lineH + 2f, rect.width, rect.height - lineH - 2f);
-        DrawManagedRefBody(bodyRect, element);
-    }
-};
-        
         // ✅ 드래그로 순서 바꾼 뒤: 선택 유지 + dirty 처리
         _commandsList.onReorderCallbackWithDetails = (list, oldIndex, newIndex) =>
         {
@@ -1056,7 +1257,22 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                     DelayModify("Add Command", so =>
                     {
                         var fresh = so.FindProperty(propPath);
-                        AddManagedRefCommand(fresh, () => CreateCommandInstance(t));
+                        if (fresh == null || !fresh.isArray)
+                            return;
+
+                        // 맨 아래 인덱스에 추가
+                        int insertAt = fresh.arraySize;
+
+                        fresh.InsertArrayElementAtIndex(insertAt);
+                        var el = fresh.GetArrayElementAtIndex(insertAt);
+                        el.managedReferenceValue = CreateCommandInstance(t);
+
+                        // 방금 추가된 커맨드를 선택 대상으로 표시
+                        _pendingCommandIndex = insertAt;
+                        _commandsList = null;          // ReorderableList 리빌드 유도
+
+                        // 다음 Repaint에서 스크롤을 새 커맨드 위치로 내리기
+                        _scrollToNewCommand = true;
                     });
                 });
             }
@@ -1192,10 +1408,11 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             }
         }
 
-        string screenId = cmdProp.FindPropertyRelative("screenId")?.stringValue ?? "";
-        string widgetId = cmdProp.FindPropertyRelative("widgetId")?.stringValue ?? "";
-        if (!string.IsNullOrWhiteSpace(screenId) || !string.IsNullOrWhiteSpace(widgetId))
-            return $"#{index} {typeName}  ({screenId}/{widgetId})";
+        string screenId    = cmdProp.FindPropertyRelative("screenId")?.stringValue    ?? "";
+        string widgetRoleKey = cmdProp.FindPropertyRelative("widgetRoleKey")?.stringValue ?? "";
+
+        if (!string.IsNullOrWhiteSpace(screenId) || !string.IsNullOrWhiteSpace(widgetRoleKey))
+            return $"#{index} {typeName}  ({screenId}/{widgetRoleKey})";
 
         return $"#{index} {typeName}";
     }
@@ -1356,123 +1573,130 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     }
 
     private void HandleCommandShortcuts(SerializedProperty commandsProp)
+{
+    if (commandsProp == null || !commandsProp.isArray) return;
+    if (_commandsList == null) return;
+
+    var e = Event.current;
+    if (e == null || e.type != EventType.KeyDown) return;
+
+    // 텍스트 편집 중엔 Delete를 빼앗지 않음
+    if (EditorGUIUtility.editingTextField) return;
+
+    bool mod = e.control || e.command;
+
+    // 1) Delete / Backspace (mod 키 없이) → 커맨드 삭제
+    if (!mod && (e.keyCode == KeyCode.Delete/* || e.keyCode == KeyCode.Backspace*/))
     {
-        if (commandsProp == null || !commandsProp.isArray) return;
-        if (_commandsList == null) return;
-
-        var e = Event.current;
-        if (e == null || e.type != EventType.KeyDown) return;
-
-        // 텍스트 편집 중엔 Delete를 빼앗지 않음
-        if (EditorGUIUtility.editingTextField) return;
-
-        bool mod = e.control || e.command;
-
-        // ----- Ctrl/Cmd + E -----
-        if (mod && e.keyCode == KeyCode.E)
+        int idx = _commandsList.index;
+        if (idx >= 0 && idx < commandsProp.arraySize)
         {
-            // Command 삭제 우선
-            int idx = _commandsList.index;
-            if (idx >= 0 && idx < commandsProp.arraySize)
+            DeleteSelectedCommand(commandsProp);
+            e.Use();   // 여기서 이벤트 소비 → Node 쪽으로 안 올라가서 "움찔" 방지
+        }
+        return;
+    }
+
+    // 2) Ctrl/Cmd + E → 커맨드 삭제 (지금 있던 로직 유지)
+    if (mod && e.keyCode == KeyCode.E)
+    {
+        int idx = _commandsList.index;
+        if (idx >= 0 && idx < commandsProp.arraySize)
+        {
+            DeleteSelectedCommand(commandsProp);
+            e.Use();
+        }
+
+        return;
+    }
+
+    // 3) Ctrl/Cmd + C / V / D 는 기존 그대로
+    // ----- Ctrl/Cmd + C -----
+    if (e.keyCode == KeyCode.C)
+    {
+        int idx = _commandsList.index;
+        if (idx >= 0 && idx < commandsProp.arraySize)
+        {
+            var el = commandsProp.GetArrayElementAtIndex(idx);
+            if (el != null && el.propertyType == SerializedPropertyType.ManagedReference)
             {
-                DeleteSelectedCommand(commandsProp);
+                CopyCommandToClipboard(el.managedReferenceValue as CommandSpecBase);
                 e.Use();
             }
-            return;
         }
 
-        // ----- Ctrl/Cmd + C -----
-        if (e.keyCode == KeyCode.C)
+        return;
+    }
+
+    // ----- Ctrl/Cmd + V -----
+    if (e.keyCode == KeyCode.V)
+    {
+        if (!TryGetClipboardJson(out string json))
+            return;
+
+        int insertAt = commandsProp.arraySize;
+        int sel = _commandsList.index;
+        if (sel >= 0 && sel < commandsProp.arraySize)
+            insertAt = sel + 1;
+
+        string propPath = commandsProp.propertyPath;
+
+        DelayModify("Paste Command", so =>
         {
-            int idx = _commandsList.index;
-            if (idx >= 0 && idx < commandsProp.arraySize)
+            var fresh = so.FindProperty(propPath);
+            if (fresh == null || !fresh.isArray) return;
+
+            insertAt = Mathf.Clamp(insertAt, 0, fresh.arraySize);
+
+            fresh.InsertArrayElementAtIndex(insertAt);
+            var pastedEl = fresh.GetArrayElementAtIndex(insertAt);
+            pastedEl.managedReferenceValue = CreateCommandFromJson(json);
+
+            _pendingCommandIndex = insertAt;
+            _commandsList = null;
+        });
+
+        e.Use();
+        return;
+    }
+
+    // ----- Ctrl/Cmd + D = Duplicate -----
+    if (e.keyCode == KeyCode.D)
+    {
+        int idx = _commandsList.index;
+        if (idx >= 0 && idx < commandsProp.arraySize)
+        {
+            var el = commandsProp.GetArrayElementAtIndex(idx);
+            if (el != null && el.propertyType == SerializedPropertyType.ManagedReference)
             {
-                var el = commandsProp.GetArrayElementAtIndex(idx);
-                if (el != null && el.propertyType == SerializedPropertyType.ManagedReference)
+                CopyCommandToClipboard(el.managedReferenceValue as CommandSpecBase);
+
+                if (TryGetClipboardJson(out string json))
                 {
-                    CopyCommandToClipboard(el.managedReferenceValue as CommandSpecBase);
-                    e.Use();
-                }
-            }
+                    int insertAt = idx + 1;
+                    string propPath = commandsProp.propertyPath;
 
-            return;
-        }
-
-        // ----- Ctrl/Cmd + V -----
-        if (e.keyCode == KeyCode.V)
-        {
-            if (!TryGetClipboardJson(out string json))
-                return;
-
-            // 붙여넣기 위치: 선택 커맨드 "다음" (선택 없으면 맨 끝)
-            int insertAt = commandsProp.arraySize;
-            int sel = _commandsList.index;
-            if (sel >= 0 && sel < commandsProp.arraySize)
-                insertAt = sel + 1;
-
-            string propPath = commandsProp.propertyPath;
-
-            DelayModify("Paste Command", so =>
-            {
-                var fresh = so.FindProperty(propPath);
-                if (fresh == null || !fresh.isArray) return;
-
-                insertAt = Mathf.Clamp(insertAt, 0, fresh.arraySize);
-
-                fresh.InsertArrayElementAtIndex(insertAt);
-                var pastedEl = fresh.GetArrayElementAtIndex(insertAt);
-
-                // 매 Paste마다 새 인스턴스를 만들어 넣기(연속 붙여넣기 시 동일 참조 방지)
-                pastedEl.managedReferenceValue = CreateCommandFromJson(json);
-
-                _pendingCommandIndex = insertAt; // 새로 붙인 커맨드 선택 유지
-                _commandsList = null; // 리빌드 유도
-            });
-
-            e.Use();
-            return;
-        }
-
-        // (선택) Ctrl/Cmd + D = Duplicate (현재 선택 커맨드 복제)
-        if (e.keyCode == KeyCode.D)
-        {
-            int idx = _commandsList.index;
-            if (idx >= 0 && idx < commandsProp.arraySize)
-            {
-                var el = commandsProp.GetArrayElementAtIndex(idx);
-                if (el != null && el.propertyType == SerializedPropertyType.ManagedReference)
-                {
-                    // 내부적으로 복사-붙여넣기 동작
-                    CopyCommandToClipboard(el.managedReferenceValue as CommandSpecBase);
-
-                    // 바로 Paste 트리거
-                    // (키 이벤트 재사용하지 말고 로직만 호출)
-                    if (TryGetClipboardJson(out string json))
+                    DelayModify("Duplicate Command", so =>
                     {
-                        int insertAt = idx + 1;
-                        string propPath = commandsProp.propertyPath;
+                        var fresh = so.FindProperty(propPath);
+                        if (fresh == null || !fresh.isArray) return;
 
-                        DelayModify("Duplicate Command", so =>
-                        {
-                            var fresh = so.FindProperty(propPath);
-                            if (fresh == null || !fresh.isArray) return;
+                        insertAt = Mathf.Clamp(insertAt, 0, fresh.arraySize);
+                        fresh.InsertArrayElementAtIndex(insertAt);
 
-                            insertAt = Mathf.Clamp(insertAt, 0, fresh.arraySize);
-                            fresh.InsertArrayElementAtIndex(insertAt);
+                        var pastedEl = fresh.GetArrayElementAtIndex(insertAt);
+                        pastedEl.managedReferenceValue = CreateCommandFromJson(json);
 
-                            var pastedEl = fresh.GetArrayElementAtIndex(insertAt);
-                            pastedEl.managedReferenceValue = CreateCommandFromJson(json);
+                        _pendingCommandIndex = insertAt;
+                        _commandsList = null;
+                    });
 
-                            _pendingCommandIndex = insertAt;
-                            _commandsList = null;
-                        });
-
-                        e.Use();
-                    }
+                    e.Use();
                 }
             }
         }
     }
+}
 
     private CommandSpecBase CreateCommandInstance(Type t)
     {
@@ -1485,7 +1709,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                 inst.screenId = _defaultScreenId;
 
             if (!string.IsNullOrWhiteSpace(_defaultWidgetId))
-                inst.widgetRefKey = _defaultWidgetId;
+                inst.widgetRoleKey = _defaultWidgetId;
         }
 
         return inst;
@@ -1534,6 +1758,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                 el.isExpanded = expanded; // ✅ restore others
         }
     }
+
     private static float GetManagedRefBodyHeight(SerializedProperty managedRef, float vSpace = 2f)
     {
         if (managedRef == null) return 0f;
@@ -1542,7 +1767,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
         float h = 0f;
 
-        var it  = managedRef.Copy();
+        var it = managedRef.Copy();
         var end = it.GetEndProperty();
 
         // 첫 child로 이동
@@ -1566,7 +1791,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         if (managedRef.propertyType != SerializedPropertyType.ManagedReference) return;
         if (!managedRef.isExpanded) return;
 
-        var it  = managedRef.Copy();
+        var it = managedRef.Copy();
         var end = it.GetEndProperty();
 
         bool hasChild = it.NextVisible(true);
@@ -1589,6 +1814,68 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                     break;
             }
         }
+    }
+
+    private void SetAllCommandFoldouts(SerializedProperty commandsProp, bool expanded)
+    {
+        if (commandsProp == null || !commandsProp.isArray) return;
+
+        for (int i = 0; i < commandsProp.arraySize; i++)
+        {
+            var el = commandsProp.GetArrayElementAtIndex(i);
+            if (el == null) continue;
+            if (el.propertyType != SerializedPropertyType.ManagedReference) continue;
+
+            el.isExpanded = expanded;
+        }
+
+        Repaint();
+    }
+    
+    private void HandleGlobalCommandDeleteShortcut()
+    {
+        var e = Event.current;
+        if (e == null || e.type != EventType.KeyDown)
+            return;
+
+        // 텍스트 입력중이면 뺏지 않기
+        if (EditorGUIUtility.editingTextField)
+            return;
+
+        bool mod = e.control || e.command;
+
+        // Ctrl/Cmd 안 눌린 Delete / Backspace만 처리
+        if (mod) return;
+        if (e.keyCode != KeyCode.Delete && e.keyCode != KeyCode.Backspace)
+            return;
+
+        // 현재 선택된 Node / Step / Commands 찾아오기
+        if (_nodesProp == null) return;
+        if (_selectedNode < 0 || _selectedNode >= _nodesProp.arraySize) return;
+
+        var nodeProp = _nodesProp.GetArrayElementAtIndex(_selectedNode);
+        if (nodeProp == null) return;
+
+        var stepsProp = nodeProp.FindPropertyRelative("steps");
+        if (stepsProp == null || !stepsProp.isArray) return;
+        if (_selectedStep < 0 || _selectedStep >= stepsProp.arraySize) return;
+
+        var stepProp = stepsProp.GetArrayElementAtIndex(_selectedStep);
+        if (stepProp == null) return;
+
+        var commandsProp = stepProp.FindPropertyRelative("commands");
+        if (commandsProp == null || !commandsProp.isArray) return;
+
+        if (_commandsList == null) return;
+
+        int idx = _commandsList.index;
+        if (idx < 0 || idx >= commandsProp.arraySize) return;
+
+        // 🔹 실제 삭제
+        DeleteSelectedCommand(commandsProp);
+
+        // 🔹 여기서 이벤트 소비 → Nodes 리스트 쪽으로 안 넘어감
+        e.Use();
     }
 
 
