@@ -1067,15 +1067,15 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                 //        Delete Command 를 주입할 수 있는 extendMenu 전달
                 bool handled = SequenceEditorMenuHooks.TryShowCommandMenu(
                     _cachedCommandTypes,
-                    t =>
+
+                    // 1) single
+                    onAddSingleRequested: t =>
                     {
-                        // ▶ 도메인 메뉴에서 타입 하나 선택했을 때 호출
                         DelayModify("Add Command", so =>
                         {
                             var fresh = so.FindProperty(commandsPath);
                             if (fresh == null || !fresh.isArray) return;
 
-                            // 우클릭한 커맨드 바로 아래에 삽입
                             int insertAt = Mathf.Clamp(clickedIndex + 1, 0, fresh.arraySize);
 
                             fresh.InsertArrayElementAtIndex(insertAt);
@@ -1085,14 +1085,43 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                             _pendingCommandIndex = insertAt;
                             _commandsList = null;
 
-                            // 🔹 우클릭 추가는 "주변에서만 작업"이니
-                            //    스크롤을 맨 아래로 내리지 않는다!
-                            // _scrollToNewCommand = true;   // ❌ 제거
+                            // 우클릭 추가는 스크롤 이동 X
+                            // _scrollToNewCommand = true; // ❌
                         });
                     },
-                    menu =>
+
+                    // 2) batch (✅ 세트 추가)
+                    onAddBatchRequested: types =>
                     {
-                        // 🔹 공통 Delete 항목 주입
+                        if (types == null || types.Count == 0) return;
+
+                        DelayModify("Add Command Set", so =>
+                        {
+                            var fresh = so.FindProperty(commandsPath);
+                            if (fresh == null || !fresh.isArray) return;
+
+                            int insertAt = Mathf.Clamp(clickedIndex + 1, 0, fresh.arraySize);
+
+                            // ✅ 한번의 Modify에서 N개 연속 삽입
+                            for (int i = 0; i < types.Count; i++)
+                            {
+                                int idx = insertAt + i;
+                                fresh.InsertArrayElementAtIndex(idx);
+                                var el = fresh.GetArrayElementAtIndex(idx);
+                                el.managedReferenceValue = CreateCommandInstance(types[i]);
+                            }
+
+                            _pendingCommandIndex = insertAt;
+                            _commandsList = null;
+
+                            // 우클릭 세트도 스크롤 이동 X
+                            // _scrollToNewCommand = true; // ❌
+                        });
+                    },
+
+                    // 3) extend menu
+                    extendMenu: menu =>
+                    {
                         menu.AddSeparator("");
                         menu.AddItem(new GUIContent("Delete Command"), false, () =>
                         {
@@ -1104,7 +1133,9 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                                 _commandsList = null;
                             });
                         });
-                    });
+                    }
+                );
+
 
                 // 2단계: Hook가 처리 안 했다면(flat fallback)
                 if (!handled)
@@ -1309,15 +1340,16 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         // 1) 먼저 외부 훅에 메뉴 생성을 위임해 본다.
         bool handled = SequenceEditorMenuHooks.TryShowCommandMenu(
             _cachedCommandTypes,
-            t =>
+
+            // 1) single (기존 그대로: 맨 아래 append)
+            onAddSingleRequested: t =>
             {
                 string propPath = commandsProp.propertyPath;
 
                 DelayModify("Add Command", so =>
                 {
                     var fresh = so.FindProperty(propPath);
-                    if (fresh == null || !fresh.isArray)
-                        return;
+                    if (fresh == null || !fresh.isArray) return;
 
                     int insertAt = fresh.arraySize;
 
@@ -1327,9 +1359,39 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
                     _pendingCommandIndex = insertAt;
                     _commandsList = null;
-                    _scrollToNewCommand = true;
+                    _scrollToNewCommand = true; // +Command는 스크롤 내려주는 게 좋음
                 });
-            });
+            },
+
+            // 2) batch (세트 추가: 맨 아래로 연속 append)
+            onAddBatchRequested: types =>
+            {
+                if (types == null || types.Count == 0) return;
+
+                string propPath = commandsProp.propertyPath;
+
+                DelayModify("Add Command Set", so =>
+                {
+                    var fresh = so.FindProperty(propPath);
+                    if (fresh == null || !fresh.isArray) return;
+
+                    int insertAt = fresh.arraySize;
+
+                    for (int i = 0; i < types.Count; i++)
+                    {
+                        int idx = insertAt + i;
+                        fresh.InsertArrayElementAtIndex(idx);
+                        var el = fresh.GetArrayElementAtIndex(idx);
+                        el.managedReferenceValue = CreateCommandInstance(types[i]);
+                    }
+
+                    _pendingCommandIndex = insertAt;
+                    _commandsList = null;
+                    _scrollToNewCommand = true; // ✅ 세트 추가 후에도 내려가기
+                });
+            },
+            extendMenu: null
+        );
 
         if (handled)
             return; // 도메인이 메뉴를 처리했으면 여기서 끝.
@@ -2066,7 +2128,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         var t = src.GetType();
         var clone = (CommandSpecBase)Activator.CreateInstance(t);
 
-        // ✅ EditorJsonUtility는 SerializeReference(폴리모픽) 복사에 유리
+        // EditorJsonUtility는 SerializeReference(폴리모픽) 복사에 유리
         string json = EditorJsonUtility.ToJson(src);
         EditorJsonUtility.FromJsonOverwrite(json, clone);
 
