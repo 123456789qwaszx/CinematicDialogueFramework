@@ -6,9 +6,9 @@ public class StepGatePlanBuilder
     {
         var gate = new StepGateState
         {
-            Tokens      = new List<GateToken>(8),
+            Tokens   = new List<GateToken>(8),
             Cursor   = 0,
-            InFlight    = default
+            InFlight = default
         };
 
         if (state == null || sequence == null || sequence.nodes == null)
@@ -39,18 +39,9 @@ public class StepGatePlanBuilder
         {
             StepSpec step = node.steps[i];
 
-            // If the step is null or its gate token is default/unset, fall back to Input.
-            GateToken token = step?.gate ?? default;
-            
-            bool isUnset = EqualityComparer<GateToken>.Default.Equals(token, default);
-            if (isUnset)
-                token = GateToken.Input();
-
+            GateToken token = step?.gate ?? GateToken.Immediately();
             gate.Tokens.Add(token);
         }
-
-        if (gate.Tokens.Count == 0)
-            gate.Tokens.Add(GateToken.Input());
 
         state.StepGate = gate;
     }
