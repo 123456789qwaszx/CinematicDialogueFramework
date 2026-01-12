@@ -21,7 +21,7 @@ public sealed class PresentationSession
     private SequenceProgressState _state;
     private SequenceSpecSO _sequence;
     
-    public bool IsRunning => _sequence != null && _state != null;
+    public bool IsRunning => _sequence != null && _state != null && _sessionScope != null;
     
     public PresentationSession(
         StepGatePlanBuilder gatePlanner,
@@ -56,7 +56,7 @@ public sealed class PresentationSession
         _gatePlanner.BuildForCurrentNode(_sequence, _state);
         
         PlayStep(
-            nodeIndex: _state.CurrentNodeIndex,
+            nodeIndex: _state.NodeIndex,
             stepIndex: _state.StepGate.Cursor);
     }
     
@@ -79,13 +79,13 @@ public sealed class PresentationSession
             if (!advanced)
                 break;
             
-            if (_state.IsNodeStepsCompleted)
+            if (_state.IsNodeCompleted)
             {
                 // ---- Node boundary ----
-                _state.CurrentNodeIndex++;
-                int newNodeIndex = _state.CurrentNodeIndex;
+                _state.NodeIndex++;
+                int nextNodeIndex = _state.NodeIndex;
 
-                if (_state.CurrentNodeIndex >= _sequence.nodes.Count)
+                if (_state.NodeIndex >= _sequence.nodes.Count)
                 {
                     _gateAdvancer.ClearLatchedSignals();
                     End();
@@ -96,14 +96,14 @@ public sealed class PresentationSession
                 _gatePlanner.BuildForCurrentNode(_sequence, _state);
 
                 int firstStep = _state.StepGate.Cursor;
-                PlayStep(newNodeIndex, firstStep);
+                PlayStep(nextNodeIndex, firstStep);
                 return;
             }
 
             // ---- Step boundary ----
-            int currentNode = _state.CurrentNodeIndex;
+            int currentNodeIndex = _state.NodeIndex;
             int currentStep = _state.StepGate.Cursor;
-            PlayStep(currentNode, currentStep);
+            PlayStep(currentNodeIndex, currentStep);
         } 
         
         // === TIME PROGRESSION ENDS ===

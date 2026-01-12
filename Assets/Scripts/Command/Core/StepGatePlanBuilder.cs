@@ -11,6 +11,7 @@ public class StepGatePlanBuilder
             InFlight = default
         };
 
+        // Fallback: in an invalid state. Add one Immediate so Advancer can run once and exit safely.
         if (state == null || sequence == null || sequence.nodes == null)
         {
             gate.Tokens.Add(GateToken.Immediately());
@@ -18,15 +19,15 @@ public class StepGatePlanBuilder
             return;
         }
 
-        // End-of-sequence: always ensure at least one token
-        if (state.CurrentNodeIndex >= sequence.nodes.Count)
+        // End of sequence: keep a single Immediate so Tick() can reach Session.End() cleanly.
+        if (state.NodeIndex >= sequence.nodes.Count)
         {
             gate.Tokens.Add(GateToken.Immediately());
             state.StepGate = gate;
             return;
         }
 
-        NodeSpec node = sequence.nodes[state.CurrentNodeIndex];
+        NodeSpec node = sequence.nodes[state.NodeIndex];
 
         if (node == null || node.steps == null || node.steps.Count == 0)
         {

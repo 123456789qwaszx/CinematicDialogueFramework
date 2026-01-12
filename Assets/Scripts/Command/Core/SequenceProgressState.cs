@@ -5,7 +5,7 @@ public sealed class SequenceProgressState
 {
     public string RouteKey;
     public string StartKey;
-    public int CurrentNodeIndex;
+    public int NodeIndex;
     
     public StepGateState StepGate;
 
@@ -13,10 +13,9 @@ public sealed class SequenceProgressState
     {
         RouteKey = route.RouteKey;
         StartKey = route.StartKey;
-        CurrentNodeIndex = 0;
+        NodeIndex = 0;
         StepGate = default;
     }
     
-    public int StepGateTokenCount => StepGate.Count;
-    public bool IsNodeStepsCompleted => StepGate.IsCompleted;
+    public bool IsNodeCompleted => StepGate.IsCompleted;
 }
