@@ -18,21 +18,6 @@ public sealed class RouteMapping
     public string startKey;
 }
 
-// Immutable runtime snapshot
-public readonly struct Route
-{
-    public readonly string RouteKey;
-    public readonly SequenceCatalogSO SequenceCatalog;
-    public readonly string StartKey;
-
-    public Route(RouteMapping entry)
-    {
-        RouteKey = entry.routeKey;
-        SequenceCatalog = entry.sequenceCatalog;
-        StartKey = entry.startKey;
-    }
-}
-
 [CreateAssetMenu(fileName = "RouteCatalog", menuName = "Presentation/Route Catalog")]
 public sealed class RouteCatalogSO : ScriptableObject, IRouteCatalog<Route>
 {

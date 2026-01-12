@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 63a118fa2d7c7da48b450ac8c9efc91d, type: 3}
-  m_Name: RouteCatalog
+  m_Name: StubRouteCatalog
   m_EditorClassIdentifier: Assembly-CSharp::RouteCatalogSO
   routes:
-  - routeKey: z_r1
+  - routeKey: stub.route
     sequenceCatalog: {fileID: 11400000, guid: ce47742c20f622d4d9017e0cba31d618, type: 2}
-    startKey: z_seq1
+    startKey: stub.seq
   fallbackRouteKey: Default
   fallbackStartKey: Default

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public sealed class PresentationRoutePlayer : MonoBehaviour
+public sealed class StubRoutePlayer : MonoBehaviour
 {
     [SerializeField] private UnitySignalBus signals;
     [SerializeField] private CommandExecutor commandExecutor;

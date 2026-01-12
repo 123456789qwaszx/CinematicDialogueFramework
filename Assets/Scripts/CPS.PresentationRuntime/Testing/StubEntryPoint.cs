@@ -1,11 +1,11 @@
 using UnityEngine;
 
-public sealed class PresentationEntryPoint : MonoBehaviour
+public sealed class StubEntryPoint : MonoBehaviour
 {
     [SerializeField] private RouteCatalogSO routeCatalog;
-    [SerializeField] private PresentationRoutePlayer prp;
+    [SerializeField] private StubRoutePlayer prp;
 
-    [SerializeField] public string RouteKey = "z_seq1";
+    [SerializeField] public string RouteKey = "stub.seq";
     private PresentationSession _session;
 
     public void StartSession()
