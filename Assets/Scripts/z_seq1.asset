@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77efca1a7ac39ca499c3be8e21666640, type: 3}
+  m_Name: z_seq1
+  m_EditorClassIdentifier: Assembly-CSharp::SequenceSpecSO
+  sequenceKey: z_seq1
+  nodes:
+  - editorName: 
+    steps:
+    - editorName: 
+      commands:
+      - rid: 2406591535356837949
+      gate:
+        type: 1
+        seconds: 0
+        signalKey: 
+    - editorName: 
+      commands:
+      - rid: 2406591535356837951
+      gate:
+        type: 2
+        seconds: 1
+        signalKey: 
+  - editorName: 
+    steps:
+    - editorName: 
+      commands:
+      - rid: 2406591535356837953
+      gate:
+        type: 0
+        seconds: 0
+        signalKey: 
+  references:
+    version: 2
+    RefIds:
+    - rid: 2406591535356837949
+      type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetRoleKey: 
+    - rid: 2406591535356837951
+      type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetRoleKey: 
+    - rid: 2406591535356837953
+      type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetRoleKey: 

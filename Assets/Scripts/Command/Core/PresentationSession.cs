@@ -9,10 +9,9 @@ public sealed class PresentationSession
     private readonly StepGatePlanBuilder _gatePlanner;
     private readonly StepGateAdvancer _gateAdvancer;
     private readonly CommandExecutor _executor;
-    private readonly RouteCatalogSO _routeCatalog;
     
     // ---- Session-owned context ----
-    public PresentationSessionContext Context { get; }
+    private readonly PresentationSessionContext _context;
     
     // ---- Active run (per-Session) ----
     private CommandRunScope _sessionScope;
@@ -27,29 +26,23 @@ public sealed class PresentationSession
         StepGatePlanBuilder gatePlanner,
         StepGateAdvancer gateAdvancer,
         CommandExecutor executor,
-        RouteCatalogSO routeCatalog,
         PlaybackSettings modes
     )
     {
         _gatePlanner = gatePlanner;
         _gateAdvancer = gateAdvancer;
         _executor = executor;
-        _routeCatalog = routeCatalog;
-
-        Context = new PresentationSessionContext( modes );
+        _context = new PresentationSessionContext( modes );
     }
 
-    public void Start(string routeKey)
+    
+    public void Start(Route route, SequenceSpecSO sequence)
     {
-        if (!_routeCatalog.TryResolve(routeKey, out Route route, out SequenceSpecSO sequence))
-        {
-            Debug.LogWarning($"Session failed. routeKey='{routeKey}'");
-            return;
-        }
+        if (sequence == null) return;
         
         _state = new SequenceProgressState(route);
         _sequence = sequence;
-        _sessionScope = new CommandRunScope(Context);
+        _sessionScope = new CommandRunScope(_context);
 
         _gatePlanner.BuildForCurrentNode(_sequence, _state);
         
@@ -63,7 +56,7 @@ public sealed class PresentationSession
         // === TIME PROGRESSION BEGINS ===
         if (_sequence == null || _state == null) return;
         
-        if (Context == null || Context.CloseRequested)
+        if (_context == null || _context.CloseRequested)
         {
             End();
             return;
@@ -71,7 +64,7 @@ public sealed class PresentationSession
 
         while (true)
         {
-            bool advanced = _gateAdvancer.TryAdvanceStepGate(_state, Context);
+            bool advanced = _gateAdvancer.TryAdvanceStepGate(_state, _context);
             if (!advanced)
                 break;
             
@@ -105,14 +98,11 @@ public sealed class PresentationSession
         // === TIME PROGRESSION ENDS ===
     }
     
-    
-    private void End()
+    public void RequestEnd()
     {
-        _gateAdvancer.ClearLatchedSignals();
-        _executor.FinishAll(); // clear the session scope.
-        _sequence = null;
-        _state = null;
+        _context.RequestClose();
     }
+    
     
     private void PlayStep(int nodeIndex, int stepIndex)
     {
@@ -121,5 +111,13 @@ public sealed class PresentationSession
 
         NodeSpec node = _sequence.nodes[nodeIndex];
         _executor.PlayStep(node, stepIndex, _sessionScope);
+    }
+    
+    private void End()
+    {
+        _gateAdvancer.ClearLatchedSignals();
+        _executor.FinishAll(); // clear the session scope.
+        _sequence = null;
+        _state = null;
     }
 }
