@@ -3,7 +3,7 @@ using System.Threading;
 
 public sealed class CommandRunScope
 {
-    private readonly PresentationContext _context;
+    private readonly PresentationSessionContext _context;
     public CancellationToken Token { get; set; }
 
     /// <summary>
@@ -18,7 +18,7 @@ public sealed class CommandRunScope
     /// </summary>
     internal LifetimeScope RunLifetime { get; } = new();
 
-    public CommandRunScope(PresentationContext context)
+    public CommandRunScope(PresentationSessionContext context)
     {
         _context = context;
         Token = CancellationToken.None;
@@ -26,7 +26,7 @@ public sealed class CommandRunScope
 
     public bool IsSkipping => _context != null && _context.IsSkipping;
     public bool IsAutoMode => _context != null && _context.IsAutoMode;
-    public float TimeScale => (_context != null && _context.TimeScale > 0f) ? _context.TimeScale : 1f;
+    public float TimeScale => _context != null ? _context.TimeScale : 1f;
     public bool IsNodeBusy => _context != null && _context.IsNodeBusy;
 
     /// <summary>
@@ -34,8 +34,7 @@ public sealed class CommandRunScope
     /// </summary>
     public void SetNodeBusy(bool busy)
     {
-        if (_context != null)
-            _context.IsNodeBusy = busy;
+        _context?.SetNodeBusy(busy);
     }
 
     // Boundary cleanup

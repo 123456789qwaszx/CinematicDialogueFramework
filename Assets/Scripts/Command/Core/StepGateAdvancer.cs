@@ -38,7 +38,7 @@ public class StepGateAdvancer : IDisposable
     /// - On success: StepGate.StepIndex is advanced (or skipped to end).
     /// - On failure: blocked by input/time/signal/busy state.
     /// </summary>
-    public bool TryAdvanceStepGate(SequenceProgressState state, PresentationContext ctx)
+    public bool TryAdvanceStepGate(SequenceProgressState state, PresentationSessionContext ctx)
     {
         if (state.StepGate.Tokens == null || state.StepGate.Cursor >= state.StepGate.Tokens.Count)
             return false;
@@ -81,8 +81,11 @@ public class StepGateAdvancer : IDisposable
         }
     }
 
-    private bool TickInput(SequenceProgressState state, PresentationContext ctx)
+    private bool TickInput(SequenceProgressState state, PresentationSessionContext ctx)
     {
+        if (ctx.IsBlockingInput)
+            return false;
+        
         if (ctx.IsAutoMode)
         {
             return TickAutoInput(state, ctx);
@@ -97,14 +100,16 @@ public class StepGateAdvancer : IDisposable
         return false;
     }
 
-    private bool TickAutoInput(SequenceProgressState state, PresentationContext ctx)
+    private bool TickAutoInput(SequenceProgressState state, PresentationSessionContext ctx)
     {
-        float delay = ctx.AutoAdvanceDelay <= 0f ? 0.4f : ctx.AutoAdvanceDelay;
+        float delay = ctx.AutoAdvanceDelay;
 
         if (state.StepGate.InFlight.RemainingSeconds <= 0f)
             state.StepGate.InFlight.RemainingSeconds = delay;
-
-        float dt = _time.UnscaledDeltaTime * (ctx.TimeScale <= 0f ? 0.01f : ctx.TimeScale);
+        
+        float timeScale = ctx.TimeScale;
+        
+        float dt = _time.UnscaledDeltaTime * timeScale;
         state.StepGate.InFlight.RemainingSeconds -= dt;
 
         if (state.StepGate.InFlight.RemainingSeconds <= 0f)
@@ -117,7 +122,7 @@ public class StepGateAdvancer : IDisposable
         return false;
     }
 
-    private bool TickDelay(SequenceProgressState state, PresentationContext ctx, float seconds)
+    private bool TickDelay(SequenceProgressState state, PresentationSessionContext ctx, float seconds)
     {
         if (seconds <= 0f)
         {
@@ -127,8 +132,10 @@ public class StepGateAdvancer : IDisposable
 
         if (state.StepGate.InFlight.RemainingSeconds <= 0f)
             state.StepGate.InFlight.RemainingSeconds = seconds;
+        
+        float timeScale = ctx.TimeScale;
 
-        float dt = _time.UnscaledDeltaTime * (ctx != null && ctx.TimeScale > 0f ? ctx.TimeScale : 0.01f);
+        float dt = _time.UnscaledDeltaTime * timeScale;
         state.StepGate.InFlight.RemainingSeconds -= dt;
 
         if (state.StepGate.InFlight.RemainingSeconds <= 0f)

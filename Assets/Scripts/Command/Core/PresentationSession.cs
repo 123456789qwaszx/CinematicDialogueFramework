@@ -12,7 +12,7 @@ public sealed class PresentationSession
     private readonly RouteCatalogSO _routeCatalog;
     
     // ---- Session-owned context ----
-    public PresentationContext Context { get; }
+    public PresentationSessionContext Context { get; }
     
     // ---- Active run (per-Session) ----
     private CommandRunScope _sessionScope;
@@ -25,21 +25,19 @@ public sealed class PresentationSession
     
     public PresentationSession(
         StepGatePlanBuilder gatePlanner,
-        StepGateAdvancer gateRunner,
+        StepGateAdvancer gateAdvancer,
         CommandExecutor executor,
         RouteCatalogSO routeCatalog,
-        PresentationModes modes
+        PlaybackSettings modes
     )
     {
         _gatePlanner = gatePlanner;
-        _gateAdvancer = gateRunner;
+        _gateAdvancer = gateAdvancer;
         _executor = executor;
         _routeCatalog = routeCatalog;
 
-        Context = new PresentationContext { Modes = modes };
+        Context = new PresentationSessionContext( modes );
     }
-    
-    #region Public API
 
     public void Start(string routeKey)
     {
@@ -59,19 +57,17 @@ public sealed class PresentationSession
             nodeIndex: _state.NodeIndex,
             stepIndex: _state.StepGate.Cursor);
     }
-    
-    public void End()
-    {
-        _gateAdvancer.ClearLatchedSignals();
-        _executor.FinishAll();
-        _sequence = null;
-        _state = null;
-    }
 
     public void Tick()
     {
         // === TIME PROGRESSION BEGINS ===
         if (_sequence == null || _state == null) return;
+        
+        if (Context == null || Context.CloseRequested)
+        {
+            End();
+            return;
+        }
 
         while (true)
         {
@@ -109,10 +105,15 @@ public sealed class PresentationSession
         // === TIME PROGRESSION ENDS ===
     }
     
-    #endregion
-
-    #region internal helpers
-
+    
+    private void End()
+    {
+        _gateAdvancer.ClearLatchedSignals();
+        _executor.FinishAll(); // clear the session scope.
+        _sequence = null;
+        _state = null;
+    }
+    
     private void PlayStep(int nodeIndex, int stepIndex)
     {
         if (nodeIndex < 0 || nodeIndex >= _sequence.nodes.Count)
@@ -121,6 +122,4 @@ public sealed class PresentationSession
         NodeSpec node = _sequence.nodes[nodeIndex];
         _executor.PlayStep(node, stepIndex, _sessionScope);
     }
-    
-    #endregion
 }
