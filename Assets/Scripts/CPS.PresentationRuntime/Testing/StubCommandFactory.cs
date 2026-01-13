@@ -34,7 +34,15 @@ public class StubCommandFactory : INodeCommandFactory
     }
 }
 
-
+[CommandMenuHint(
+    "stub0/stub1",
+    "Stub2",
+    Sets = new[]
+    {
+        "Custom/stub3/stub4"
+    },
+    SetOrder = 40,
+    Order = 40)]
 public sealed class StubCommandSpec : CommandSpecBase
 {
     

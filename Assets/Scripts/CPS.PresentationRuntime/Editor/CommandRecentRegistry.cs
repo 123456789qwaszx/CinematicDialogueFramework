@@ -7,7 +7,7 @@ using UnityEditor;
 public static class CommandRecentRegistry
 {
     // EditorPrefs에 저장할 키
-    private const string PrefKey  = "RecentCommands";
+    private const string PrefKey  = "CPS.SeqRecentCommands";
     private const int    MaxCount = 8;   // 최근 명령 최대 개수(원하면 조절)
 
     /// <summary>

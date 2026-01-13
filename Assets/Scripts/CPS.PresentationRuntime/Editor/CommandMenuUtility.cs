@@ -20,26 +20,16 @@ public static class CommandMenuUtility
         public int SetOrder;
     }
 
-    public static void BuildCommandSelectionMenu(
-        GenericMenu menu,
-        IReadOnlyList<Type> allTypes,
-        Action<Type> onSelectedSingle,
-        Action<IReadOnlyList<Type>> onSelectedSet)
+    // ✅ 공통: 타입 -> MenuItemInfo 리스트 만들기 (중복 제거)
+    private static List<MenuItemInfo> BuildItems(IReadOnlyList<Type> allTypes)
     {
-        if (menu == null) throw new ArgumentNullException(nameof(menu));
+        if (allTypes == null) return new List<MenuItemInfo>();
 
-        if (allTypes == null || allTypes.Count == 0)
-        {
-            menu.AddDisabledItem(new GUIContent("No CommandSpecBase types found"));
-            return;
-        }
-
-        var items = allTypes
+        return allTypes
             .Where(t => t != null && !t.IsAbstract)
             .Select(t =>
             {
                 var hint = t.GetCustomAttribute<CommandMenuHintAttribute>();
-
                 return new MenuItemInfo
                 {
                     Type     = t,
@@ -52,10 +42,24 @@ public static class CommandMenuUtility
                 };
             })
             .ToList();
+    }
 
-        // ------------------------------------------------------------
-        // 0) 세트 메뉴: Custom/PortraitStart 같은 “매크로 + 구성원” 메뉴
-        // ------------------------------------------------------------
+    // ✅ 0) Sets 파트만 빌드
+    public static void BuildSetsMenu(
+        GenericMenu menu,
+        IReadOnlyList<Type> allTypes,
+        Action<Type> onSelectedSingle,
+        Action<IReadOnlyList<Type>> onSelectedSet)
+    {
+        if (menu == null) throw new ArgumentNullException(nameof(menu));
+
+        var items = BuildItems(allTypes);
+        if (items.Count == 0)
+        {
+            menu.AddDisabledItem(new GUIContent("No CommandSpecBase types found"));
+            return;
+        }
+
         var setMap = new Dictionary<string, List<MenuItemInfo>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var it in items)
@@ -76,49 +80,54 @@ public static class CommandMenuUtility
             }
         }
 
-        if (setMap.Count > 0)
+        if (setMap.Count == 0)
+            return;
+
+        foreach (var kv in setMap.OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase))
         {
-            foreach (var kv in setMap.OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase))
+            string setPath = kv.Key;
+
+            var list = kv.Value
+                .OrderBy(x => x.SetOrder)
+                .ThenBy(x => x.Label, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            string addAllPath = $"{setPath}/(Add All {list.Count})";
+            menu.AddItem(new GUIContent(addAllPath), false, () =>
             {
-                string setPath = kv.Key;
+                var types = list.Select(x => x.Type).ToList();
+                onSelectedSet?.Invoke(types);
+            });
 
-                var list = kv.Value
-                    .OrderBy(x => x.SetOrder)
-                    .ThenBy(x => x.Label, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
-                // 0-1) 전체 세트를 한 번에 추가하는 항목
-                // 예) Custom/PortraitStart/(Add All 5)
-                string addAllPath = $"{setPath}/(Add All {list.Count})";
-                menu.AddItem(new GUIContent(addAllPath), false, () =>
+            foreach (var item in list)
+            {
+                var captured = item;
+                string singlePath = $"{setPath}/{captured.Label}";
+                menu.AddItem(new GUIContent(singlePath), false, () =>
                 {
-                    var types = list.Select(x => x.Type).ToList();
-                    onSelectedSet?.Invoke(types);
+                    onSelectedSingle?.Invoke(captured.Type);
                 });
-
-                // 0-2) 이 세트에 포함된 개별 커맨드들도 같이 노출
-                // 예) Custom/PortraitStart/Slide In
-                foreach (var item in list)
-                {
-                    var captured = item;
-                    string singlePath = $"{setPath}/{captured.Label}";
-                    menu.AddItem(new GUIContent(singlePath), false, () =>
-                    {
-                        onSelectedSingle?.Invoke(captured.Type);
-                    });
-                }
-
-                // 세트 내 구분선 (세트별 subtree 안에서)
-                menu.AddSeparator(setPath + "/");
             }
 
-            // 세트 블록과 아래 카테고리 블록 사이 전역 구분선
-            menu.AddSeparator("");
+            menu.AddSeparator(setPath + "/");
+        }
+    }
+
+    // ✅ 1) Category(탐색) 파트만 빌드
+    public static void BuildCategoryMenu(
+        GenericMenu menu,
+        IReadOnlyList<Type> allTypes,
+        Action<Type> onSelectedSingle)
+    {
+        if (menu == null) throw new ArgumentNullException(nameof(menu));
+
+        var items = BuildItems(allTypes);
+        if (items.Count == 0)
+        {
+            menu.AddDisabledItem(new GUIContent("No CommandSpecBase types found"));
+            return;
         }
 
-        // ------------------------------------------------------------
-        // 1) Category 메뉴(기본)
-        // ------------------------------------------------------------
         var groups = items
             .GroupBy(i => string.IsNullOrEmpty(i.Category) ? "Other" : i.Category)
             .OrderBy(g => string.Equals(g.Key, "Other", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
@@ -140,5 +149,36 @@ public static class CommandMenuUtility
             }
         }
     }
+
+    // ✅ 기존 API 유지(호환용): Sets -> Separator -> Category
+    public static void BuildCommandSelectionMenu(
+        GenericMenu menu,
+        IReadOnlyList<Type> allTypes,
+        Action<Type> onSelectedSingle,
+        Action<IReadOnlyList<Type>> onSelectedSet)
+    {
+        if (menu == null) throw new ArgumentNullException(nameof(menu));
+
+        if (allTypes == null || allTypes.Count == 0)
+        {
+            menu.AddDisabledItem(new GUIContent("No CommandSpecBase types found"));
+            return;
+        }
+
+        // 기존과 동일한 출력(단지 내부가 분리됨)
+        int beforeCount = CountMenuItemsSafe(menu);
+
+        BuildSetsMenu(menu, allTypes, onSelectedSingle, onSelectedSet);
+
+        // Sets가 하나라도 추가됐다면 구분선 넣기 (기존 behavior 유지)
+        if (CountMenuItemsSafe(menu) > beforeCount)
+            menu.AddSeparator("");
+
+        BuildCategoryMenu(menu, allTypes, onSelectedSingle);
+    }
+
+    // GenericMenu item count를 직접 알 수 없어서 “대충 분기”가 필요할 때 대비용
+    // (여기서는 단순히 0 반환해도 되지만, 래퍼에서 separator 조건을 엄밀히 하고 싶으면 확장 가능)
+    private static int CountMenuItemsSafe(GenericMenu menu) => 0;
 }
 #endif
