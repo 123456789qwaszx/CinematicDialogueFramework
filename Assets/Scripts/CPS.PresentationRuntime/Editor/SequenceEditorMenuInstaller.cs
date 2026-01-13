@@ -36,18 +36,35 @@ public static class SequenceEditorMenuInstaller
     private static void AddRecentSection(GenericMenu menu, IReadOnlyList<Type> allTypes, Action<Type> onSingle)
     {
         var recent = CommandRecentRegistry.GetRecentTypes(allTypes);
-
+        
         if (recent.Count == 0)
         {
-            menu.AddDisabledItem(new GUIContent("Recent/(No recent commands yet)"));
-            return;
+            menu.AddDisabledItem(new GUIContent("Recent/(empty)"));
         }
-
-        foreach (var t in recent)
+        else
         {
-            var tt = t;
-            menu.AddItem(new GUIContent($"Recent/{tt.Name}"), false, () => onSingle(tt));
+            foreach (var t in recent)
+            {
+                var tt = t; // 캡처 안전
+                string label = GetDisplayLabel(tt);
+
+                menu.AddItem(new GUIContent($"Recent/{label}"), false, () => onSingle(tt));
+            }
         }
     }
+
+    private static string GetDisplayLabel(Type t)
+    {
+        if (t == null) return "(null)";
+
+        var hint = (CommandMenuHintAttribute)Attribute.GetCustomAttribute(t, typeof(CommandMenuHintAttribute));
+        string label = hint?.DisplayName;
+
+        if (string.IsNullOrWhiteSpace(label))
+            label = t.Name;
+
+        return label.Trim();
+    }
+
 }
 #endif
