@@ -78,6 +78,12 @@ MonoBehaviour:
         type: 0
         seconds: 0
         signalKey: 
+    - editorName: 
+      commands: []
+      gate:
+        type: 0
+        seconds: 0
+        signalKey: 
   references:
     version: 2
     RefIds:

@@ -2026,13 +2026,44 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     {
         if (commandsProp == null || !commandsProp.isArray) return;
 
+        string commandsPath = commandsProp.propertyPath;
+        var map = GetFoldoutMap(commandsPath);
+
+        // (선택) map이 null일 가능성은 거의 없지만 방어
+        if (map == null) return;
+
+        // 현재 리스트에 존재하는 id들만 남기도록 정리(선택 사항이지만 추천)
+        var alive = new HashSet<long>();
+
         for (int i = 0; i < commandsProp.arraySize; i++)
         {
             var el = commandsProp.GetArrayElementAtIndex(i);
             if (el == null) continue;
             if (el.propertyType != SerializedPropertyType.ManagedReference) continue;
 
+            long id = el.managedReferenceId;
+            if (id == 0) continue;
+
+            alive.Add(id);
+
+            // 핵심: foldoutMap을 소스로 쓰고 있으니 여기서도 업데이트
+            map[id] = expanded;
+
+            // 즉시 시각 반영용(다음 draw에서 map으로 다시 덮이긴 하지만, 지금 프레임엔 도움됨)
             el.isExpanded = expanded;
+        }
+
+        // (선택) map에 남아있는 “죽은 id” 제거해서 누적 방지
+        if (map.Count > alive.Count)
+        {
+            var toRemove = new List<long>();
+            foreach (var kv in map)
+            {
+                if (!alive.Contains(kv.Key))
+                    toRemove.Add(kv.Key);
+            }
+            for (int i = 0; i < toRemove.Count; i++)
+                map.Remove(toRemove[i]);
         }
 
         Repaint();
