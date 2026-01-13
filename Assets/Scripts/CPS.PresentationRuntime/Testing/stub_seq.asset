@@ -19,6 +19,8 @@ MonoBehaviour:
     - editorName: 
       commands:
       - rid: 2406591535356837949
+      - rid: 2406591557326602240
+      - rid: 2406591557326602243
       gate:
         type: 1
         seconds: 0
@@ -109,6 +111,16 @@ MonoBehaviour:
         screenId: 
         widgetRoleKey: 
     - rid: 2406591535356837959
+      type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetRoleKey: 
+    - rid: 2406591557326602240
+      type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetRoleKey: 
+    - rid: 2406591557326602243
       type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
       data:
         screenId: 

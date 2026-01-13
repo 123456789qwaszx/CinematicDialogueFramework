@@ -1344,6 +1344,8 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             // 1) single (기존 그대로: 맨 아래 append)
             onAddSingleRequested: t =>
             {
+                CommandRecentRegistry.Record(t);
+                
                 string propPath = commandsProp.propertyPath;
 
                 DelayModify("Add Command", so =>
@@ -1367,6 +1369,9 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             onAddBatchRequested: types =>
             {
                 if (types == null || types.Count == 0) return;
+                
+                foreach (var t in types)
+                    CommandRecentRegistry.Record(t);
 
                 string propPath = commandsProp.propertyPath;
 
@@ -1855,6 +1860,8 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
     private CommandSpecBase CreateCommandInstance(Type t)
     {
+        CommandRecentRegistry.Record(t);
+        
         var inst = (CommandSpecBase)Activator.CreateInstance(t);
 
         if (_autoFillIdsOnAdd && inst != null)
