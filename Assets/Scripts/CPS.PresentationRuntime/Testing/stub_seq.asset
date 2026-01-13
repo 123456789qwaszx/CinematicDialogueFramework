@@ -19,8 +19,13 @@ MonoBehaviour:
     - editorName: 
       commands:
       - rid: 2406591535356837949
-      - rid: 2406591557326602240
-      - rid: 2406591557326602243
+      - rid: 2406591570390548541
+      - rid: 2406591570390548550
+      - rid: 2406591570390548553
+      - rid: 2406591570390548552
+      - rid: 2406591570390548554
+      - rid: 2406591570390548561
+      - rid: 2406591570390548551
       gate:
         type: 1
         seconds: 0
@@ -28,13 +33,18 @@ MonoBehaviour:
     - editorName: 
       commands:
       - rid: 2406591535356837951
+      - rid: 2406591570390548648
+      - rid: 2406591570390548649
+      - rid: 2406591570390548651
+      - rid: 2406591570390548650
       gate:
         type: 2
         seconds: 1
         signalKey: 
     - editorName: 
       commands:
-      - rid: 2406591535356837954
+      - rid: 2406591570390548556
+      - rid: 2406591570390548557
       gate:
         type: 1
         seconds: 0
@@ -44,25 +54,26 @@ MonoBehaviour:
     - editorName: 
       commands:
       - rid: 2406591535356837953
-      - rid: 2406591535356837955
-      - rid: 2406591535356837956
       gate:
         type: 0
         seconds: 0
         signalKey: 
     - editorName: 
-      commands:
-      - rid: 2406591535356837957
-      - rid: 2406591535356837958
+      commands: []
       gate:
-        type: 1
+        type: 0
         seconds: 0
         signalKey: 
   - editorName: 
     steps:
     - editorName: 
-      commands:
-      - rid: 2406591535356837959
+      commands: []
+      gate:
+        type: 0
+        seconds: 0
+        signalKey: 
+    - editorName: 
+      commands: []
       gate:
         type: 0
         seconds: 0
@@ -85,42 +96,67 @@ MonoBehaviour:
       data:
         screenId: 
         widgetRoleKey: 
-    - rid: 2406591535356837954
+    - rid: 2406591570390548541
       type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
       data:
         screenId: 
         widgetRoleKey: 
-    - rid: 2406591535356837955
+    - rid: 2406591570390548550
       type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
       data:
         screenId: 
         widgetRoleKey: 
-    - rid: 2406591535356837956
+    - rid: 2406591570390548551
       type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
       data:
         screenId: 
         widgetRoleKey: 
-    - rid: 2406591535356837957
+    - rid: 2406591570390548552
       type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
       data:
         screenId: 
         widgetRoleKey: 
-    - rid: 2406591535356837958
+    - rid: 2406591570390548553
       type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
       data:
         screenId: 
         widgetRoleKey: 
-    - rid: 2406591535356837959
+    - rid: 2406591570390548554
       type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
       data:
         screenId: 
         widgetRoleKey: 
-    - rid: 2406591557326602240
+    - rid: 2406591570390548556
       type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
       data:
         screenId: 
         widgetRoleKey: 
-    - rid: 2406591557326602243
+    - rid: 2406591570390548557
+      type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetRoleKey: 
+    - rid: 2406591570390548561
+      type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetRoleKey: 
+    - rid: 2406591570390548648
+      type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetRoleKey: 
+    - rid: 2406591570390548649
+      type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetRoleKey: 
+    - rid: 2406591570390548650
+      type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
+      data:
+        screenId: 
+        widgetRoleKey: 
+    - rid: 2406591570390548651
       type: {class: StubCommandSpec, ns: , asm: Assembly-CSharp}
       data:
         screenId: 
