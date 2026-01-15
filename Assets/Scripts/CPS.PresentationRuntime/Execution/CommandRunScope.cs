@@ -44,4 +44,10 @@ public sealed class CommandRunScope
     // Domain-agnostic tracking (no DOTween/Coroutine types needed)
     public void TrackStep(Action cancel, Action finish = null) => StepLifetime.Track(cancel, finish);
     public void TrackRun (Action cancel, Action finish = null) => RunLifetime.Track(cancel, finish);
+    
+    public void CancelAll()
+    {
+        StepLifetime.Cleanup(CleanupPolicy.Cancel);
+        RunLifetime.Cleanup(CleanupPolicy.Cancel);
+    }
 }
