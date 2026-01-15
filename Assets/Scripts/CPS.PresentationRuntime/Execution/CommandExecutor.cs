@@ -216,9 +216,9 @@ public sealed class CommandExecutor : MonoBehaviour
             return CleanupPolicy.Cancel;
 
         // Skip means "complete immediately".
-        if (scope.IsSkipping)
-            return CleanupPolicy.Finish;
+        // if (scope.IsSkipping)
+        //     return CleanupPolicy.Finish;
 
-        return CleanupPolicy.Cancel;
+        return CleanupPolicy.Finish;
     }
 }
