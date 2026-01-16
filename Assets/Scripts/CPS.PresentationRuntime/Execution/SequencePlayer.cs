@@ -92,28 +92,13 @@ public sealed class SequencePlayer
             }
             else
             {
-                // ---- fire-and-forget commands ----
+                // ---- Non-blocking commands ----
                 // These still run even after PlayCommands yield break
                 _activeBackgroundRoutines.Add(routine);
 
-                if (command is CommandBase commandBase)
-                {
-                    // Register under the step lifetime so Stop/Skip can cancel it.
-                    scope.TrackStep(
-                        cancel: () => 
-                        {
-                            if (routine != null) 
-                                _host.StopCoroutine(routine); 
-                        },
-                        finish: () => 
-                        {
-                            if (routine != null)
-                                _host.StopCoroutine(routine);
-                            
-                            commandBase.OnCommandCompleted(scope);
-                        }
-                    );
-                }
+                // Non-blocking commands can optionally bind themselves to step lifetime.
+                if (command is IStepScopedCommand scopedCommand)
+                    scopedCommand.RegisterStepLifetime(scope, _host, routine);
                 
                 _host.StartCoroutine(
                     RunBackgroundRoutineToEnd(

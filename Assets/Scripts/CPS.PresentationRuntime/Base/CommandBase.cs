@@ -1,14 +1,19 @@
 using System.Collections;
 using UnityEngine;
 
-public abstract class CommandBase : ISequenceCommand
+public interface IStepScopedCommand
+{
+    void RegisterStepLifetime(CommandRunScope scope, MonoBehaviour host, IEnumerator routine);
+}
+
+public abstract class CommandBase : ISequenceCommand, IStepScopedCommand
 {
     public virtual string DebugName => GetType().Name;
-    
+
     // Ignore: drop trivial VFX/SFX/shakes on skip.
     // ExecuteEvenIfSkipping: must still run (text/log/signals).
     protected virtual SkipPolicy SkipPolicy => SkipPolicy.CompleteImmediately;
-    
+
     // If true, the StepGateRunner waits for this command to finish before moving on.
     // If false, it runs in the background (fire-and-forget) and should be tracked via SequencePlayer.
     public virtual bool WaitForCompletion => true;
@@ -27,8 +32,15 @@ public abstract class CommandBase : ISequenceCommand
                     yield break;
 
                 case SkipPolicy.CompleteImmediately:
-                    try { OnSkip(scope); }
-                    catch (System.Exception e) { Debug.LogException(e); }
+                    try
+                    {
+                        OnSkip(scope);
+                    }
+                    catch (System.Exception e)
+                    {
+                        Debug.LogException(e);
+                    }
+
                     yield break;
 
                 case SkipPolicy.ExecuteEvenIfSkipping:
@@ -37,18 +49,25 @@ public abstract class CommandBase : ISequenceCommand
         }
 
         IEnumerator inner = null;
-        try { inner = ExecuteInner(scope); }
-        catch (System.Exception e) { Debug.LogException(e); yield break; }
+        try
+        {
+            inner = ExecuteInner(scope);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogException(e);
+            yield break;
+        }
 
         if (inner != null) yield return inner;
     }
 
     protected abstract IEnumerator ExecuteInner(CommandRunScope scope);
-    
-    public virtual void OnCommandCompleted(CommandRunScope scope) { }
 
-    protected virtual void OnSkip(CommandRunScope scope) { }
-    
+    protected virtual void OnSkip(CommandRunScope scope)
+    {
+    }
+
     protected IEnumerator Wait(CommandRunScope scope, float seconds)
     {
         float elapsed = 0f;
@@ -60,16 +79,46 @@ public abstract class CommandBase : ISequenceCommand
             {
                 if (SkipPolicy == SkipPolicy.CompleteImmediately)
                 {
-                    try { OnSkip(scope); }
-                    catch (System.Exception e) { Debug.LogException(e); }
+                    try
+                    {
+                        OnSkip(scope);
+                    }
+                    catch (System.Exception e)
+                    {
+                        Debug.LogException(e);
+                    }
                 }
-                
+
                 yield break;
             }
 
             elapsed += Time.unscaledDeltaTime * scope.TimeScale;
-            
+
             yield return null;
         }
     }
+
+    public virtual void RegisterStepLifetime(
+        CommandRunScope scope,
+        MonoBehaviour host,
+        IEnumerator routine)
+    {
+        scope.TrackStep(
+            cancel: () =>
+            {
+                if (routine != null)
+                    host.StopCoroutine(routine);
+            },
+            finish: () =>
+            {
+                if (routine != null)
+                    host.StopCoroutine(routine);
+                
+                OnCommandCompleted(scope);
+            });
+    }
+    
+    // Completion hook tied to step cleanup (CleanupPolicy.Finish).
+    // Called when the step finishes (normal end / finish-all), not on Cancel-only cleanup.
+    public virtual void OnCommandCompleted(CommandRunScope scope) { }
 }
