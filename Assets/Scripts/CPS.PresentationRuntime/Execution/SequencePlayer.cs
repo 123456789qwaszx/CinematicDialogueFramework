@@ -95,16 +95,26 @@ public sealed class SequencePlayer
                 // ---- fire-and-forget commands ----
                 // These still run even after PlayCommands yield break
                 _activeBackgroundRoutines.Add(routine);
-                
-                // Register under the step lifetime so Stop/Skip can cancel it.
-                scope.TrackStep(
-                    cancel: () => { if (routine != null) _host.StopCoroutine(routine); },
-                    finish: () => { if (routine != null) _host.StopCoroutine(routine); }
-                    // NOTE: "Finish" here means "stop running" only.
-                    // The coroutine itself should observe ctx (e.g., IsSkipping / cancellation)
-                    // and apply its own final state before exiting, if needed.
-                );
 
+                if (command is CommandBase commandBase)
+                {
+                    // Register under the step lifetime so Stop/Skip can cancel it.
+                    scope.TrackStep(
+                        cancel: () => 
+                        {
+                            if (routine != null) 
+                                _host.StopCoroutine(routine); 
+                        },
+                        finish: () => 
+                        {
+                            if (routine != null)
+                                _host.StopCoroutine(routine);
+                            
+                            commandBase.OnCommandCompleted(scope);
+                        }
+                    );
+                }
+                
                 _host.StartCoroutine(
                     RunBackgroundRoutineToEnd(
                         routine,

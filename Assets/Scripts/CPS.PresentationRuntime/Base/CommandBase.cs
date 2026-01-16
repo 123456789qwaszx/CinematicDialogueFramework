@@ -44,6 +44,8 @@ public abstract class CommandBase : ISequenceCommand
     }
 
     protected abstract IEnumerator ExecuteInner(CommandRunScope scope);
+    
+    public virtual void OnCommandCompleted(CommandRunScope scope) { }
 
     protected virtual void OnSkip(CommandRunScope scope) { }
     
@@ -71,4 +73,3 @@ public abstract class CommandBase : ISequenceCommand
         }
     }
 }
-
