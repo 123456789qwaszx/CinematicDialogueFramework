@@ -11,13 +11,13 @@ public sealed class StepTracks
     [SerializeReference] public List<CommandSpecBase> dialogue    = new();
     [SerializeReference] public List<CommandSpecBase> fx          = new();
 
-    public List<CommandSpecBase> Get(CpsTrackType t) => t switch
+    public List<CommandSpecBase> Get(CommandTrackType t) => t switch
     {
-        CpsTrackType.Interaction => interaction,
-        CpsTrackType.Setup       => setup,
-        CpsTrackType.Motion      => motion,
-        CpsTrackType.Dialogue    => dialogue,
-        CpsTrackType.FX          => fx,
+        CommandTrackType.Interaction => interaction,
+        CommandTrackType.Setup       => setup,
+        CommandTrackType.Motion      => motion,
+        CommandTrackType.Dialogue    => dialogue,
+        CommandTrackType.FX          => fx,
         _ => setup
     };
 }

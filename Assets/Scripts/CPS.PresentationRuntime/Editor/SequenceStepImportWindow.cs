@@ -14,7 +14,7 @@ public sealed class SequenceStepImportWindow : EditorWindow
 
     private int _targetNodeIndex;
 
-    [MenuItem("Tools/Sequence/Sequence Step Importer")]
+    [MenuItem("Tools/Importer/Sequence Step Importer")]
     public static void Open()
     {
         GetWindow<SequenceStepImportWindow>("Sequence Step Importer");

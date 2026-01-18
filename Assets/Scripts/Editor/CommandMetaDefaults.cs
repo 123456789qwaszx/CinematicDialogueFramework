@@ -18,7 +18,7 @@ public static class CommandMetaDefaults
     public static CommandMeta GetDefault(Type t)
     {
         if (_cache.TryGetValue(t, out var m)) return m;
-        return new CommandMeta { track = CpsTrackType.Setup, phase = CpsPhase.Setup };
+        return new CommandMeta { track = CommandTrackType.Setup, phase = CommandPhase.Setup };
     }
 
     private static void BuildCache()
@@ -34,8 +34,8 @@ public static class CommandMetaDefaults
 
             var meta = new CommandMeta
             {
-                track = routing?.Track ?? CpsTrackType.Setup,
-                phase = routing?.Phase ?? CpsPhase.Setup,
+                track = routing?.Track ?? CommandTrackType.Setup,
+                phase = routing?.Phase ?? CommandPhase.Setup,
 
                 blockingHint = timing?.Blocking ?? false,
                 infiniteHint = timing?.Infinite ?? false,

@@ -7,20 +7,6 @@ using UnityEditorInternal;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
 
-/// <summary>
-/// CPS Sequence editor (Nodes / Steps / Track-based Commands).
-///
-/// ✅ Assumes your data shape:
-/// - SequenceSpecSO { string sequenceKey; List<NodeSpec> nodes; void CompileAllSteps(); }
-/// - NodeSpec { string editorName; List<StepSpec> steps; }
-/// - StepSpec { string editorName; StepTracks tracks; [SerializeReference] List<CommandSpecBase> compiled; GateToken gate; }
-/// - StepTracks { [SerializeReference] List<CommandSpecBase> interaction/setup/motion/dialogue/fx; }
-///
-/// Notes:
-/// - This editor edits ONLY Track lists. 'compiled' is read-only preview.
-/// - After any edit it calls CompileAllSteps() (safe, simple).
-/// - Reflection(TypeCache + Activator) is Editor-only for command listing & instantiation.
-/// </summary>
 public sealed class SequenceSpecEditorWindow : EditorWindow
 {
     [MenuItem("Tools/Sequence/Sequence Editor")]
@@ -56,7 +42,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     // ------------------------------
     // Track UI
     // ------------------------------
-    private CpsTrackType _activeTrack = CpsTrackType.Dialogue;
+    private CommandTrackType _activeTrack = CommandTrackType.Dialogue;
     private static readonly GUIContent[] TrackTabs =
     {
         new GUIContent("Interaction"),
@@ -79,6 +65,8 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     private bool _isDraggingSteps;
     private int _pendingCommandIndex = -1;
     private bool _scrollToNewCommand;
+    
+    
 
     private float _nodesW;
     private float _stepsW;
@@ -96,6 +84,22 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     // Foldouts (SerializeReference stable id)
     // ------------------------------
     private readonly Dictionary<string, Dictionary<long, bool>> _commandFoldoutsByPath = new();
+    
+    private const string FoldoutKeyPrefix = "CPS.SequenceEditor.Foldouts.";
+
+    [Serializable]
+    private sealed class FoldoutStateBox
+    {
+        public List<PathEntry> entries = new();
+    }
+
+    [Serializable]
+    private sealed class PathEntry
+    {
+        public string path;
+        public List<long> ids = new();
+        public List<bool> values = new();
+    }
 
     // ------------------------------
     // Polymorphic Command Types
@@ -117,6 +121,19 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         CacheCommandTypes();
 
         RebuildIfNeeded(force: true);
+        LoadFoldouts();
+    }
+    
+    private void OnDisable()
+    {
+        SaveFoldouts();
+        EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+    }
+    
+    private void OnPlayModeStateChanged(PlayModeStateChange state)
+    {
+        if (state == PlayModeStateChange.ExitingEditMode)
+            SaveFoldouts(); // ✅ 플레이 들어가기 직전에 저장
     }
 
     private void OnSelectionChange()
@@ -125,6 +142,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         {
             targetSequence = so;
             RebuildIfNeeded(force: true);
+            LoadFoldouts();
             Repaint();
         }
     }
@@ -164,7 +182,14 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             DrawNodesPanel();
             DrawRightPanel();
         }
-
+        
+        bool changed = _so.ApplyModifiedProperties();
+        if (changed)
+        {
+            EditorUtility.SetDirty(targetSequence);
+            ForceCompileAll();
+        }
+        
         _so.ApplyModifiedProperties();
     }
 
@@ -178,9 +203,12 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             EditorGUI.BeginChangeCheck();
             targetSequence = (SequenceSpecSO)EditorGUILayout.ObjectField(targetSequence, typeof(SequenceSpecSO), false);
             if (EditorGUI.EndChangeCheck())
-                RebuildIfNeeded(force: true);
+            {
+            RebuildIfNeeded(force: true);
+            LoadFoldouts();
+            }
 
-            GUILayout.FlexibleSpace();
+        GUILayout.FlexibleSpace();
 
             _search = _searchField != null ? _searchField.OnToolbarGUI(_search ?? "") : (_search ?? "");
 
@@ -386,7 +414,17 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                 using (new EditorGUI.DisabledScope(!validCommands))
                 {
                     if (GUILayout.Button("+ Command", GUILayout.Width(100), GUILayout.Height(34)))
-                        AddCommand(trackListProp);
+                    {
+                        string commandsPath = trackListProp.propertyPath;
+                        int insertAt = trackListProp.arraySize;
+
+                        ShowCommandAddMenu(
+                            commandsPath,
+                            insertAt: insertAt,
+                            onSingle: t => InsertSingleAt(commandsPath, insertAt, t, scroll: true),
+                            onBatch:  types => InsertBatchAt(commandsPath, insertAt, types, scroll: true)
+                        );
+                    }
                 }
 
                 GUILayout.FlexibleSpace();
@@ -558,6 +596,87 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             EditorGUILayout.LabelField("Later: visualize blocking commands & durations using spec.Meta hints.");
         }
     }
+    
+    private string GetFoldoutStorageKey()
+{
+    if (targetSequence == null) return null;
+
+    string assetPath = AssetDatabase.GetAssetPath(targetSequence);
+    if (string.IsNullOrEmpty(assetPath)) return null;
+
+    string guid = AssetDatabase.AssetPathToGUID(assetPath);
+    if (string.IsNullOrEmpty(guid)) return null;
+
+    return FoldoutKeyPrefix + guid;
+}
+
+private void SaveFoldouts()
+{
+    string key = GetFoldoutStorageKey();
+    if (string.IsNullOrEmpty(key)) return;
+
+    var box = new FoldoutStateBox();
+
+    foreach (var kv in _commandFoldoutsByPath)
+    {
+        if (string.IsNullOrEmpty(kv.Key) || kv.Value == null) continue;
+
+        var entry = new PathEntry { path = kv.Key };
+        foreach (var kv2 in kv.Value)
+        {
+            entry.ids.Add(kv2.Key);
+            entry.values.Add(kv2.Value);
+        }
+
+        box.entries.Add(entry);
+    }
+
+    string json = JsonUtility.ToJson(box);
+    SessionState.SetString(key, json);
+    EditorPrefs.SetString(key, json);
+}
+
+private void LoadFoldouts()
+{
+    string key = GetFoldoutStorageKey();
+    if (string.IsNullOrEmpty(key)) return;
+
+    string json = SessionState.GetString(key, "");
+    if (string.IsNullOrEmpty(json))
+        json = EditorPrefs.GetString(key, "");
+
+    _commandFoldoutsByPath.Clear();
+
+    if (string.IsNullOrEmpty(json)) return;
+
+    try
+    {
+        var box = JsonUtility.FromJson<FoldoutStateBox>(json);
+        if (box?.entries == null) return;
+
+        foreach (var entry in box.entries)
+        {
+            if (entry == null || string.IsNullOrEmpty(entry.path)) continue;
+            if (entry.ids == null || entry.values == null) continue;
+
+            var map = new Dictionary<long, bool>();
+            int n = Mathf.Min(entry.ids.Count, entry.values.Count);
+
+            for (int i = 0; i < n; i++)
+            {
+                long id = entry.ids[i];
+                if (id == 0) continue;
+                map[id] = entry.values[i];
+            }
+
+            _commandFoldoutsByPath[entry.path] = map;
+        }
+    }
+    catch
+    {
+        // 깨진 데이터면 무시
+    }
+}
 
     // ------------------------------
     // Rebuild / Lists
@@ -1059,40 +1178,35 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                 Repaint();
 
                 int clickedIndex = index;
+                int insertAt = clickedIndex + 1;
 
-                ShowContextMenu(menu =>
-                {
-                    menu.AddItem(new GUIContent("Add Command (Below)"), false, () =>
+                // Reuse the same menu as header/none-area:
+                // Sets / Recent / Category
+                ShowCommandAddMenu(
+                    commandsPath: commandsPath,
+                    insertAt: insertAt,
+                    onSingle: t => InsertSingleAt(commandsPath, insertAt, t, scroll: false),
+                    onBatch: types => InsertBatchAt(commandsPath, insertAt, types, scroll: false),
+                    extendMenu: menu =>
                     {
-                        ShowCommandAddMenu(
-                            commandsPath: commandsPath,
-                            insertAt: clickedIndex + 1,
-                            onSingle: t => InsertSingleAt(commandsPath, clickedIndex + 1, t, scroll: false),
-                            onBatch: types => InsertBatchAt(commandsPath, clickedIndex + 1, types, scroll: false)
-                        );
-                    });
+                        menu.AddSeparator("");
 
-                    menu.AddSeparator("");
-
-                    menu.AddItem(new GUIContent("Copy"), false, () =>
-                    {
-                        var el = commandsProp.GetArrayElementAtIndex(clickedIndex);
-                        if (el != null && el.propertyType == SerializedPropertyType.ManagedReference)
-                            CopyCommandToClipboard(el.managedReferenceValue as CommandSpecBase);
-                    });
-
-                    menu.AddItem(new GUIContent("Delete"), false, () =>
-                    {
-                        DeleteCommandAt(commandsPath, clickedIndex, after: () =>
+                        menu.AddItem(new GUIContent("Delete"), false, () =>
                         {
-                            if (_commandsList != null)
-                                _commandsList.index = Mathf.Clamp(clickedIndex - 1, 0, commandsProp.arraySize - 2);
-                            _commandsList = null;
+                            DeleteCommandAt(commandsPath, clickedIndex, after: () =>
+                            {
+                                if (_commandsList != null)
+                                    _commandsList.index = Mathf.Clamp(clickedIndex - 1, 0, Mathf.Max(0, _commandsList.count - 2));
+                                _commandsList = null;
 
-                            ForceCompileAll();
+                                ForceCompileAll();
+                            });
                         });
-                    });
-                });
+                    }
+                );
+
+                // If you still want Delete on row context (at the very bottom),
+                // we’ll add it via extendMenu inside ShowCommandAddMenu (next section).
 
                 e.Use();
                 return;
@@ -1123,6 +1237,8 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                 element.isExpanded = newExpanded;
                 if (foldoutMap != null && id != 0)
                     foldoutMap[id] = newExpanded;
+                
+                SaveFoldouts();
             }
             else
             {
@@ -1442,11 +1558,11 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
         return _activeTrack switch
         {
-            CpsTrackType.Interaction => tracksProp.FindPropertyRelative("interaction"),
-            CpsTrackType.Setup       => tracksProp.FindPropertyRelative("setup"),
-            CpsTrackType.Motion      => tracksProp.FindPropertyRelative("motion"),
-            CpsTrackType.Dialogue    => tracksProp.FindPropertyRelative("dialogue"),
-            CpsTrackType.FX          => tracksProp.FindPropertyRelative("fx"),
+            CommandTrackType.Interaction => tracksProp.FindPropertyRelative("interaction"),
+            CommandTrackType.Setup       => tracksProp.FindPropertyRelative("setup"),
+            CommandTrackType.Motion      => tracksProp.FindPropertyRelative("motion"),
+            CommandTrackType.Dialogue    => tracksProp.FindPropertyRelative("dialogue"),
+            CommandTrackType.FX          => tracksProp.FindPropertyRelative("fx"),
             _ => tracksProp.FindPropertyRelative("dialogue"),
         };
     }
@@ -1974,26 +2090,42 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         string commandsPath,
         int insertAt,
         Action<Type> onSingle,
-        Action<IReadOnlyList<Type>> onBatch)
+        Action<IReadOnlyList<Type>> onBatch,
+        Action<GenericMenu> extendMenu = null)
     {
         CacheCommandTypes();
 
-        var menu = new GenericMenu();
+        // 1) Try external hook first (Sets / Recent / Category)
+        bool handled = SequenceEditorMenuHooks.TryShowCommandMenu(
+            commandTypes: _cachedCommandTypes,
+            onAddSingleRequested: onSingle,
+            onAddBatchRequested: onBatch,
+            extendMenu: menu =>
+            {
+                extendMenu?.Invoke(menu);
+            });
+
+        if (handled)
+            return;
+
+        // 2) Fallback: plain list (old behavior)
+        var fallback = new GenericMenu();
 
         if (_cachedCommandTypes == null || _cachedCommandTypes.Count == 0)
         {
-            menu.AddDisabledItem(new GUIContent("No command types found"));
+            fallback.AddDisabledItem(new GUIContent("No command types found"));
         }
         else
         {
             foreach (var t in _cachedCommandTypes)
             {
                 var tt = t;
-                menu.AddItem(new GUIContent(tt.Name), false, () => onSingle(tt));
+                fallback.AddItem(new GUIContent(tt.Name), false, () => onSingle(tt));
             }
         }
-
-        menu.ShowAsContext();
+        
+        extendMenu?.Invoke(fallback);
+        fallback.ShowAsContext();
     }
 
     // ------------------------------
@@ -2391,24 +2523,24 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         });
     }
 
-    private static int TrackToIndex(CpsTrackType t) => t switch
+    private static int TrackToIndex(CommandTrackType t) => t switch
     {
-        CpsTrackType.Interaction => 0,
-        CpsTrackType.Setup       => 1,
-        CpsTrackType.Motion      => 2,
-        CpsTrackType.Dialogue    => 3,
-        CpsTrackType.FX          => 4,
+        CommandTrackType.Interaction => 0,
+        CommandTrackType.Setup       => 1,
+        CommandTrackType.Motion      => 2,
+        CommandTrackType.Dialogue    => 3,
+        CommandTrackType.FX          => 4,
         _ => 3
     };
 
-    private static CpsTrackType IndexToTrack(int i) => i switch
+    private static CommandTrackType IndexToTrack(int i) => i switch
     {
-        0 => CpsTrackType.Interaction,
-        1 => CpsTrackType.Setup,
-        2 => CpsTrackType.Motion,
-        3 => CpsTrackType.Dialogue,
-        4 => CpsTrackType.FX,
-        _ => CpsTrackType.Dialogue
+        0 => CommandTrackType.Interaction,
+        1 => CommandTrackType.Setup,
+        2 => CommandTrackType.Motion,
+        3 => CommandTrackType.Dialogue,
+        4 => CommandTrackType.FX,
+        _ => CommandTrackType.Dialogue
     };
 
     // ------------------------------

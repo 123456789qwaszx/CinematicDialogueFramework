@@ -1,6 +1,6 @@
 using System;
 
-public enum CpsTrackType
+public enum CommandTrackType
 {
     Interaction = 0,
     Setup       = 10,
@@ -9,7 +9,7 @@ public enum CpsTrackType
     FX          = 40,
 }
 
-public enum CpsPhase
+public enum CommandPhase
 {
     Setup = 0,
     Motion,
@@ -21,8 +21,8 @@ public enum CpsPhase
 [Serializable]
 public struct CommandMeta
 {
-    public CpsTrackType track;
-    public CpsPhase phase;
+    public CommandTrackType track;
+    public CommandPhase phase;
 
     // Timing Preview용(계기판)
     public bool blockingHint;   // 기본적으로 step 진행을 잡는가?

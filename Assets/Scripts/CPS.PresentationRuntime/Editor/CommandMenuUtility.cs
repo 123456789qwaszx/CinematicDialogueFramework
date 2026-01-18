@@ -12,39 +12,52 @@ public static class CommandMenuUtility
     {
         public Type Type;
         public CommandMenuHintAttribute Hint;
+
         public string Category;
         public string Label;
-        public int Order;
 
         public string[] Sets;
         public int SetOrder;
+        public int Order;
     }
 
-    // ✅ 공통: 타입 -> MenuItemInfo 리스트 만들기 (중복 제거)
     private static List<MenuItemInfo> BuildItems(IReadOnlyList<Type> allTypes)
     {
         if (allTypes == null) return new List<MenuItemInfo>();
 
         return allTypes
-            .Where(t => t != null && !t.IsAbstract)
+            .Where(t =>
+                t != null &&
+                !t.IsAbstract &&
+                !t.IsGenericType &&
+                !t.ContainsGenericParameters)
             .Select(t =>
             {
                 var hint = t.GetCustomAttribute<CommandMenuHintAttribute>();
+
+                string category = (hint?.Category ?? "Other").Trim();
+                if (string.IsNullOrEmpty(category)) category = "Other";
+
+                string label = (hint?.DisplayName ?? t.Name).Trim();
+                if (string.IsNullOrEmpty(label)) label = t.Name;
+
                 return new MenuItemInfo
                 {
                     Type     = t,
                     Hint     = hint,
-                    Category = (hint?.Category ?? "Other").Trim(),
-                    Label    = (hint?.DisplayName ?? t.Name).Trim(),
-                    Order    = hint?.Order ?? 0,
+                    Category = category,
+                    Label    = label,
                     Sets     = hint?.Sets,
-                    SetOrder = hint?.SetOrder ?? 0
+                    SetOrder = hint?.SetOrder ?? 0,
+                    Order    = hint?.Order ?? 0
                 };
             })
             .ToList();
     }
 
-    // ✅ 0) Sets 파트만 빌드
+    // ---------------------------
+    // 1) Sets Menu (top)
+    // ---------------------------
     public static void BuildSetsMenu(
         GenericMenu menu,
         IReadOnlyList<Type> allTypes,
@@ -64,12 +77,15 @@ public static class CommandMenuUtility
 
         foreach (var it in items)
         {
-            if (it.Sets == null) continue;
+            if (it.Sets == null || it.Sets.Length == 0)
+                continue;
 
-            foreach (var setPathRaw in it.Sets)
+            for (int i = 0; i < it.Sets.Length; i++)
             {
-                var setPath = (setPathRaw ?? "").Trim();
-                if (string.IsNullOrEmpty(setPath)) continue;
+                string raw = it.Sets[i];
+                string setPath = (raw ?? "").Trim();
+                if (string.IsNullOrEmpty(setPath))
+                    continue;
 
                 if (!setMap.TryGetValue(setPath, out var list))
                 {
@@ -83,15 +99,19 @@ public static class CommandMenuUtility
         if (setMap.Count == 0)
             return;
 
+        // Sort set folders by path
         foreach (var kv in setMap.OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase))
         {
             string setPath = kv.Key;
 
+            // Sort items within a set
             var list = kv.Value
                 .OrderBy(x => x.SetOrder)
+                .ThenBy(x => x.Order)
                 .ThenBy(x => x.Label, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
+            // Add "Add All"
             string addAllPath = $"{setPath}/(Add All {list.Count})";
             menu.AddItem(new GUIContent(addAllPath), false, () =>
             {
@@ -99,6 +119,7 @@ public static class CommandMenuUtility
                 onSelectedSet?.Invoke(types);
             });
 
+            // Add each command entry
             foreach (var item in list)
             {
                 var captured = item;
@@ -109,11 +130,14 @@ public static class CommandMenuUtility
                 });
             }
 
+            // separator inside this folder
             menu.AddSeparator(setPath + "/");
         }
     }
 
-    // ✅ 1) Category(탐색) 파트만 빌드
+    // ---------------------------
+    // 2) Category Menu (bottom)
+    // ---------------------------
     public static void BuildCategoryMenu(
         GenericMenu menu,
         IReadOnlyList<Type> allTypes,
@@ -128,6 +152,7 @@ public static class CommandMenuUtility
             return;
         }
 
+        // Group by category; "Other" always last
         var groups = items
             .GroupBy(i => string.IsNullOrEmpty(i.Category) ? "Other" : i.Category)
             .OrderBy(g => string.Equals(g.Key, "Other", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
@@ -140,8 +165,8 @@ public static class CommandMenuUtility
                 .OrderBy(x => x.Order)
                 .ThenBy(x => x.Label, StringComparer.OrdinalIgnoreCase))
             {
-                string path = $"{g.Key}/{i.Label}";
                 var captured = i;
+                string path = $"{g.Key}/{captured.Label}";
                 menu.AddItem(new GUIContent(path), false, () =>
                 {
                     onSelectedSingle?.Invoke(captured.Type);
@@ -149,36 +174,5 @@ public static class CommandMenuUtility
             }
         }
     }
-
-    // ✅ 기존 API 유지(호환용): Sets -> Separator -> Category
-    public static void BuildCommandSelectionMenu(
-        GenericMenu menu,
-        IReadOnlyList<Type> allTypes,
-        Action<Type> onSelectedSingle,
-        Action<IReadOnlyList<Type>> onSelectedSet)
-    {
-        if (menu == null) throw new ArgumentNullException(nameof(menu));
-
-        if (allTypes == null || allTypes.Count == 0)
-        {
-            menu.AddDisabledItem(new GUIContent("No CommandSpecBase types found"));
-            return;
-        }
-
-        // 기존과 동일한 출력(단지 내부가 분리됨)
-        int beforeCount = CountMenuItemsSafe(menu);
-
-        BuildSetsMenu(menu, allTypes, onSelectedSingle, onSelectedSet);
-
-        // Sets가 하나라도 추가됐다면 구분선 넣기 (기존 behavior 유지)
-        if (CountMenuItemsSafe(menu) > beforeCount)
-            menu.AddSeparator("");
-
-        BuildCategoryMenu(menu, allTypes, onSelectedSingle);
-    }
-
-    // GenericMenu item count를 직접 알 수 없어서 “대충 분기”가 필요할 때 대비용
-    // (여기서는 단순히 0 반환해도 되지만, 래퍼에서 separator 조건을 엄밀히 하고 싶으면 확장 가능)
-    private static int CountMenuItemsSafe(GenericMenu menu) => 0;
 }
 #endif

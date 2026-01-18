@@ -2,21 +2,21 @@ using System.Collections.Generic;
 
 public static class StepCompiler
 {
-    private static readonly CpsPhase[] PhaseOrder =
+    private static readonly CommandPhase[] PhaseOrder =
     {
-        CpsPhase.Setup, CpsPhase.Motion, CpsPhase.Dialogue, CpsPhase.FX, CpsPhase.Teardown
+        CommandPhase.Setup, CommandPhase.Motion, CommandPhase.Dialogue, CommandPhase.FX, CommandPhase.Teardown
     };
 
-    private static readonly CpsTrackType[] TrackOrder =
+    private static readonly CommandTrackType[] TrackOrder =
     {
-        CpsTrackType.Interaction, CpsTrackType.Setup, CpsTrackType.Motion, CpsTrackType.Dialogue, CpsTrackType.FX
+        CommandTrackType.Interaction, CommandTrackType.Setup, CommandTrackType.Motion, CommandTrackType.Dialogue, CommandTrackType.FX
     };
 
     public static void CompileInto(StepSpec step)
     {
         step.compiled.Clear();
 
-        foreach (CpsPhase phase in PhaseOrder)
+        foreach (CommandPhase phase in PhaseOrder)
         {
             foreach (List<CommandSpecBase> list in EnumerateTrackLists(step.tracks, TrackOrder))
             {
@@ -33,17 +33,17 @@ public static class StepCompiler
         }
     }
 
-    private static IEnumerable<List<CommandSpecBase>> EnumerateTrackLists(StepTracks t, CpsTrackType[] order)
+    private static IEnumerable<List<CommandSpecBase>> EnumerateTrackLists(StepTracks t, CommandTrackType[] order)
     {
         foreach (var tr in order)
         {
             yield return tr switch
             {
-                CpsTrackType.Interaction => t.interaction,
-                CpsTrackType.Setup       => t.setup,
-                CpsTrackType.Motion      => t.motion,
-                CpsTrackType.Dialogue    => t.dialogue,
-                CpsTrackType.FX          => t.fx,
+                CommandTrackType.Interaction => t.interaction,
+                CommandTrackType.Setup       => t.setup,
+                CommandTrackType.Motion      => t.motion,
+                CommandTrackType.Dialogue    => t.dialogue,
+                CommandTrackType.FX          => t.fx,
                 _ => t.setup
             };
         }

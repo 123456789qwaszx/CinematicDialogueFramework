@@ -59,7 +59,7 @@ public class StubCommandFactory : INodeCommandFactory
 
 
 [Serializable]
-[CommandRouting(CpsTrackType.Dialogue, CpsPhase.Dialogue)]
+[CommandRouting(CommandTrackType.Dialogue, CommandPhase.Dialogue)]
 [CommandTimingHint(blocking: true, duration: 0f)]
 [CommandMenuHint(
     "stub0/stub1",
@@ -93,7 +93,7 @@ public sealed class StubCommand : CommandBase
 }
 
 [Serializable]
-[CommandRouting(CpsTrackType.Dialogue, CpsPhase.Dialogue)]
+[CommandRouting(CommandTrackType.Dialogue, CommandPhase.Dialogue)]
 [CommandTimingHint(blocking: false, duration: 0f)]
 [CommandMenuHint("Debug", "Log", Order = 1)]
 public sealed class LogCommandSpec : CommandSpecBase
@@ -130,7 +130,7 @@ public sealed class LogCommand : CommandBase
 
 
 [Serializable]
-[CommandRouting(CpsTrackType.Interaction, CpsPhase.Setup)]
+[CommandRouting(CommandTrackType.Interaction, CommandPhase.Setup)]
 [CommandTimingHint(blocking: true, duration: 0.5f)]
 [CommandMenuHint("Debug", "Log Wait", Order = 2)]
 public sealed class LogWaitCommandSpec : CommandSpecBase
@@ -176,7 +176,7 @@ public sealed class LogWaitCommand : CommandBase
 
 
 [Serializable]
-[CommandRouting(CpsTrackType.Interaction, CpsPhase.Setup)]
+[CommandRouting(CommandTrackType.Interaction, CommandPhase.Setup)]
 [CommandTimingHint(blocking: false, duration: 0f)]
 [CommandMenuHint("Debug", "Log Signal", Order = 3)]
 public sealed class LogSignalCommandSpec : CommandSpecBase

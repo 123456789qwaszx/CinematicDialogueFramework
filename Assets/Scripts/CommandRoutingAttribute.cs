@@ -3,10 +3,10 @@ using System;
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class CommandRoutingAttribute : Attribute
 {
-    public readonly CpsTrackType Track;
-    public readonly CpsPhase Phase;
+    public readonly CommandTrackType Track;
+    public readonly CommandPhase Phase;
 
-    public CommandRoutingAttribute(CpsTrackType track, CpsPhase phase)
+    public CommandRoutingAttribute(CommandTrackType track, CommandPhase phase)
     {
         Track = track;
         Phase = phase;
