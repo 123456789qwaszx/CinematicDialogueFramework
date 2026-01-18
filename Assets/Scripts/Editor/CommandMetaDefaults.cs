@@ -1,49 +1,39 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
-using System.Reflection;
-using UnityEditor;
-//using UnityEditor.TypeCache;
 
-[InitializeOnLoad]
 public static class CommandMetaDefaults
 {
-    private static readonly Dictionary<Type, CommandMeta> _cache = new();
-
-    static CommandMetaDefaults()
-    {
-        BuildCache();
-    }
+    private static readonly Dictionary<Type, CommandMeta> Cache = new();
 
     public static CommandMeta GetDefault(Type t)
     {
-        if (_cache.TryGetValue(t, out var m)) return m;
-        return new CommandMeta { track = CommandTrackType.Setup, phase = CommandPhase.Setup };
-    }
+        if (t == null) return default;
+        if (Cache.TryGetValue(t, out var meta)) return meta;
 
-    private static void BuildCache()
-    {
-        _cache.Clear();
+        meta = default;
 
-        foreach (var t in TypeCache.GetTypesDerivedFrom<CommandSpecBase>())
+        // 1) routing
+        var routing = (CommandRoutingAttribute)Attribute.GetCustomAttribute(t, typeof(CommandRoutingAttribute));
+        if (routing != null)
         {
-            if (t.IsAbstract) continue;
-
-            var routing = t.GetCustomAttribute<CommandRoutingAttribute>(false);
-            var timing  = t.GetCustomAttribute<CommandTimingHintAttribute>(false);
-
-            var meta = new CommandMeta
-            {
-                track = routing?.Track ?? CommandTrackType.Setup,
-                phase = routing?.Phase ?? CommandPhase.Setup,
-
-                blockingHint = timing?.Blocking ?? false,
-                infiniteHint = timing?.Infinite ?? false,
-                durationHint = timing?.Duration ?? 0f,
-            };
-
-            _cache[t] = meta;
+            meta.track = (CommandTrackType)(int)routing.Track;
+            meta.phase = (CommandPhase)(int)routing.Phase;
         }
+
+        // 2) timing hint
+        var timing = (CommandTimingHintAttribute)Attribute.GetCustomAttribute(t, typeof(CommandTimingHintAttribute));
+        if (timing != null)
+        {
+            meta.blockingHint = timing.Blocking;
+            meta.infiniteHint = timing.Infinite;
+            meta.durationHint = timing.Duration;
+        }
+
+        Cache[t] = meta;
+        return meta;
     }
+
+    public static void ClearCache() => Cache.Clear();
 }
 #endif

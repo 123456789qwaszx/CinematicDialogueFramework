@@ -43,6 +43,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     // Track UI
     // ------------------------------
     private CommandTrackType _activeTrack = CommandTrackType.Dialogue;
+
     private static readonly GUIContent[] TrackTabs =
     {
         new GUIContent("Interaction"),
@@ -65,8 +66,11 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     private bool _isDraggingSteps;
     private int _pendingCommandIndex = -1;
     private bool _scrollToNewCommand;
-    
-    
+
+    private bool _scrollToCommandIndex;
+    private int _scrollTargetCommandIndex = -1;
+    private Vector2 _compiledScroll;
+    private bool _compiledFoldout = true;
 
     private float _nodesW;
     private float _stepsW;
@@ -80,11 +84,15 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     [SerializeField] private string _defaultScreenId = "";
     [SerializeField] private string _defaultWidgetId = "";
 
+    private const string PrefKey_DefaultScreenId = "CPS.SequenceEditor.DefaultScreenId";
+    private const string PrefKey_DefaultWidgetId = "CPS.SequenceEditor.DefaultRoleKey";
+    private const string PrefKey_AutoFillOnAdd = "CPS.SequenceEditor.AutoFillIdsOnAdd";
+
     // ------------------------------
     // Foldouts (SerializeReference stable id)
     // ------------------------------
     private readonly Dictionary<string, Dictionary<long, bool>> _commandFoldoutsByPath = new();
-    
+
     private const string FoldoutKeyPrefix = "CPS.SequenceEditor.Foldouts.";
 
     [Serializable]
@@ -107,7 +115,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
     private static List<Type> _cachedCommandTypes;
 
     private const string CommandClipboardPrefix = "CPS_CMD_SPEC::";
-    private const string StepClipboardPrefix    = "CPS_STEP_SPEC::";
+    private const string StepClipboardPrefix = "CPS_STEP_SPEC::";
 
     // ------------------------------
     // Unity callbacks
@@ -120,20 +128,24 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         _searchField = new SearchField();
         CacheCommandTypes();
 
+        _autoFillIdsOnAdd = EditorPrefs.GetBool(PrefKey_AutoFillOnAdd, _autoFillIdsOnAdd);
+        _defaultScreenId = EditorPrefs.GetString(PrefKey_DefaultScreenId, _defaultScreenId);
+        _defaultWidgetId = EditorPrefs.GetString(PrefKey_DefaultWidgetId, _defaultWidgetId);
+
         RebuildIfNeeded(force: true);
         LoadFoldouts();
     }
-    
+
     private void OnDisable()
     {
         SaveFoldouts();
         EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
     }
-    
+
     private void OnPlayModeStateChanged(PlayModeStateChange state)
     {
         if (state == PlayModeStateChange.ExitingEditMode)
-            SaveFoldouts(); // ✅ 플레이 들어가기 직전에 저장
+            SaveFoldouts();
     }
 
     private void OnSelectionChange()
@@ -182,14 +194,14 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             DrawNodesPanel();
             DrawRightPanel();
         }
-        
+
         bool changed = _so.ApplyModifiedProperties();
         if (changed)
         {
             EditorUtility.SetDirty(targetSequence);
             ForceCompileAll();
         }
-        
+
         _so.ApplyModifiedProperties();
     }
 
@@ -204,11 +216,11 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             targetSequence = (SequenceSpecSO)EditorGUILayout.ObjectField(targetSequence, typeof(SequenceSpecSO), false);
             if (EditorGUI.EndChangeCheck())
             {
-            RebuildIfNeeded(force: true);
-            LoadFoldouts();
+                RebuildIfNeeded(force: true);
+                LoadFoldouts();
             }
 
-        GUILayout.FlexibleSpace();
+            GUILayout.FlexibleSpace();
 
             _search = _searchField != null ? _searchField.OnToolbarGUI(_search ?? "") : (_search ?? "");
 
@@ -230,7 +242,8 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                 float old = EditorGUIUtility.labelWidth;
                 EditorGUIUtility.labelWidth = 90f;
 
-                EditorGUILayout.PropertyField(_sequenceKeyProp, new GUIContent("sequenceKey"), GUILayout.MaxWidth(360f));
+                EditorGUILayout.PropertyField(_sequenceKeyProp, new GUIContent("sequenceKey"),
+                    GUILayout.MaxWidth(360f));
                 EditorGUIUtility.labelWidth = old;
 
                 GUILayout.FlexibleSpace();
@@ -240,32 +253,62 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
             using (new EditorGUILayout.HorizontalScope())
             {
+                EditorGUI.BeginChangeCheck();
                 _autoFillIdsOnAdd = EditorGUILayout.ToggleLeft("Auto-fill", _autoFillIdsOnAdd, GUILayout.Width(80f));
+                if (EditorGUI.EndChangeCheck())
+                    EditorPrefs.SetBool(PrefKey_AutoFillOnAdd, _autoFillIdsOnAdd);
 
                 GUILayout.Space(8f);
 
                 EditorGUILayout.LabelField("ScreenId", GUILayout.Width(60f));
-                _defaultScreenId = EditorGUILayout.TextField(_defaultScreenId, GUILayout.Width(170f));
+                EditorGUI.BeginChangeCheck();
+                string newScreenId = EditorGUILayout.TextField(_defaultScreenId, GUILayout.Width(170f));
+                if (EditorGUI.EndChangeCheck())
+                {
+                    _defaultScreenId = newScreenId;
+                    EditorPrefs.SetString(PrefKey_DefaultScreenId, _defaultScreenId);
+                }
 
                 GUILayout.Space(16f);
 
-                EditorGUILayout.LabelField("WidgetRoleKey", GUILayout.Width(90f));
-                _defaultWidgetId = EditorGUILayout.TextField(_defaultWidgetId, GUILayout.Width(170f));
+                EditorGUILayout.LabelField("RoleKey", GUILayout.Width(90f));
+                EditorGUI.BeginChangeCheck();
+                string newWidget = EditorGUILayout.TextField(_defaultWidgetId, GUILayout.Width(170f));
+                if (EditorGUI.EndChangeCheck())
+                {
+                    _defaultWidgetId = newWidget;
+                    EditorPrefs.SetString(PrefKey_DefaultWidgetId, _defaultWidgetId);
+                }
 
                 GUILayout.FlexibleSpace();
 
-                using (new EditorGUI.DisabledScope(!CanApplyIdsToCurrentStepActiveTrack() && !CanApplyIdsToCurrentStepAllTracks()))
+                // 각 버튼을 개별 조건으로 Disable
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button(new GUIContent("Apply IDs (Active)", "Apply default IDs to active track commands."),
-                            GUILayout.Width(130f)))
+                    // Step 단위
+                    using (new EditorGUI.DisabledScope(!CanApplyIdsToCurrentStep()))
                     {
-                        ApplyDefaultIdsToCurrentStep(activeOnly: true);
+                        if (GUILayout.Button(
+                                new GUIContent("Apply IDs (Step)",
+                                    "Apply default IDs to ALL tracks in the current step."),
+                                GUILayout.Width(140f)))
+                        {
+                            ApplyDefaultIdsToCurrentStep();
+                        }
                     }
 
-                    if (GUILayout.Button(new GUIContent("Apply IDs (All)", "Apply default IDs to ALL tracks in this step."),
-                            GUILayout.Width(110f)))
+                    GUILayout.Space(4f);
+
+                    // Node 단위
+                    using (new EditorGUI.DisabledScope(!CanApplyIdsToCurrentNode()))
                     {
-                        ApplyDefaultIdsToCurrentStep(activeOnly: false);
+                        if (GUILayout.Button(
+                                new GUIContent("Apply IDs (Node)",
+                                    "Apply default IDs to ALL steps in the current node."),
+                                GUILayout.Width(140f)))
+                        {
+                            ApplyDefaultIdsToCurrentNode();
+                        }
                     }
                 }
             }
@@ -382,6 +425,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                     {
                         _rightScroll = scroll.scrollPosition;
 
+                        // ✅ 스크롤 안에는 Step 본문(커맨드 리스트까지)만
                         DrawStepDetail(stepProp);
 
                         if (_scrollToNewCommand && Event.current.type == EventType.Repaint)
@@ -389,7 +433,26 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                             _rightScroll.y = float.MaxValue;
                             _scrollToNewCommand = false;
                         }
+
+                        if (_scrollToCommandIndex && Event.current.type == EventType.Repaint)
+                        {
+                            const float baseOffset = 180f;
+                            const float perRow = 54f;
+
+                            _rightScroll.y = baseOffset + (_scrollTargetCommandIndex * perRow);
+
+                            _scrollToCommandIndex = false;
+                            _scrollTargetCommandIndex = -1;
+                        }
                     }
+
+                    EditorGUILayout.Space(4);
+
+                    DrawCompiledPreview(stepProp);
+
+                    EditorGUILayout.Space(4);
+
+                    //DrawTimingHint(stepProp);
 
                     DrawBottomCommandBar(stepProp);
                 }
@@ -422,7 +485,7 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                             commandsPath,
                             insertAt: insertAt,
                             onSingle: t => InsertSingleAt(commandsPath, insertAt, t, scroll: true),
-                            onBatch:  types => InsertBatchAt(commandsPath, insertAt, types, scroll: true)
+                            onBatch: types => InsertBatchAt(commandsPath, insertAt, types, scroll: true)
                         );
                     }
                 }
@@ -494,7 +557,9 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         var trackListProp = FindActiveTrackList(stepProp);
         if (trackListProp == null || !trackListProp.isArray)
         {
-            EditorGUILayout.HelpBox("StepSpec.tracks.<track> list is missing or not an array. Check StepTracks field names.", MessageType.Error);
+            EditorGUILayout.HelpBox(
+                "StepSpec.tracks.<track> list is missing or not an array. Check StepTracks field names.",
+                MessageType.Error);
             return;
         }
 
@@ -503,16 +568,6 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         EnsureCommandsList(stepProp, trackListProp);
         _commandsList?.DoLayoutList();
         HandleCommandShortcuts(trackListProp);
-
-        EditorGUILayout.Space(10);
-
-        // Compiled preview (read-only)
-        DrawCompiledPreview(stepProp);
-
-        EditorGUILayout.Space(6);
-
-        // Optional: tiny timing hint (simple)
-        DrawTimingHint(stepProp);
     }
 
     private void DrawTrackTabs()
@@ -541,7 +596,9 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
         var compiledProp = stepProp.FindPropertyRelative("compiled");
         if (compiledProp == null || !compiledProp.isArray)
         {
-            EditorGUILayout.HelpBox("StepSpec.compiled missing. (It should exist as [SerializeReference] List<CommandSpecBase> compiled)", MessageType.Warning);
+            EditorGUILayout.HelpBox(
+                "StepSpec.compiled missing. (It should exist as [SerializeReference] List<CommandSpecBase> compiled)",
+                MessageType.Warning);
             return;
         }
 
@@ -549,7 +606,18 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
 
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
-            EditorGUILayout.LabelField($"Compiled (Runtime Order)  ({count})", EditorStyles.boldLabel);
+            _compiledFoldout = EditorGUILayout.Foldout(
+                _compiledFoldout,
+                $"Compiled (Runtime Order)  ({count})",
+                true); // toggleOnLabelClick = true
+
+            if (!_compiledFoldout)
+            {
+                if (count == 0)
+                    EditorGUILayout.LabelField("— empty —", EditorStyles.centeredGreyMiniLabel);
+
+                return;
+            }
 
             if (count == 0)
             {
@@ -557,32 +625,66 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
                 return;
             }
 
-            // Show a short list (first N) to keep UI light
-            const int max = 16;
-            int show = Mathf.Min(max, count);
+            var origin = BuildOriginMapForStep(stepProp);
 
-            using (new EditorGUI.DisabledScope(true))
+            const float compiledHeight = 300f;
+
+            using (var scroll = new EditorGUILayout.ScrollViewScope(
+                       _compiledScroll,
+                       GUILayout.Height(compiledHeight)))
             {
-                for (int i = 0; i < show; i++)
+                _compiledScroll = scroll.scrollPosition;
+
+                for (int i = 0; i < count; i++)
                 {
                     var el = compiledProp.GetArrayElementAtIndex(i);
-                    EditorGUILayout.LabelField(SummarizeCommand(el, i));
+                    if (el == null) continue;
+
+                    string line = SummarizeCompiledLine(el, i, origin, out bool hasDrift, out bool missingOrigin);
+
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        var style = new GUIStyle(EditorStyles.label);
+                        if (hasDrift || missingOrigin)
+                        {
+                            style.normal.textColor =
+                                EditorGUIUtility.isProSkin
+                                    ? new Color(1f, 0.78f, 0.25f)
+                                    : new Color(0.65f, 0.35f, 0.0f);
+                        }
+
+                        if (GUILayout.Button(line, style))
+                        {
+                            if (TryGetOrigin(el, origin, out var o))
+                            {
+                                JumpToOrigin(stepProp, o.track, o.index);
+                            }
+                        }
+
+                        if (missingOrigin)
+                            GUILayout.Label("(! missing)", EditorStyles.miniLabel, GUILayout.Width(70));
+                        else if (hasDrift)
+                            GUILayout.Label("(! drift)", EditorStyles.miniLabel, GUILayout.Width(50));
+                    }
                 }
-
-                if (count > show)
-                    EditorGUILayout.LabelField($"… +{count - show} more");
             }
 
-            EditorGUILayout.Space(6);
+            EditorGUILayout.Space(4);
 
-            if (GUILayout.Button(new GUIContent("Rebuild Compiled", "Recompile tracks -> compiled"), GUILayout.Width(140)))
-            {
-                DelayModify("Rebuild Compiled", so =>
-                {
-                    // Just force compile (safe full compile)
-                    ForceCompileAll();
-                }, forceRebuild: false);
-            }
+            // using (new EditorGUILayout.HorizontalScope())
+            // {
+            //     GUILayout.FlexibleSpace();
+            //
+            //     if (GUILayout.Button(
+            //             new GUIContent("Rebuild Compiled", "Recompile tracks -> compiled"),
+            //             GUILayout.Width(140)))
+            //     {
+            //         DelayModify("Rebuild Compiled", so =>
+            //         {
+            //             ForceCompileAll();
+            //         }, forceRebuild: false);
+            //     }
+            // }
         }
     }
 
@@ -596,87 +698,87 @@ public sealed class SequenceSpecEditorWindow : EditorWindow
             EditorGUILayout.LabelField("Later: visualize blocking commands & durations using spec.Meta hints.");
         }
     }
-    
+
     private string GetFoldoutStorageKey()
-{
-    if (targetSequence == null) return null;
-
-    string assetPath = AssetDatabase.GetAssetPath(targetSequence);
-    if (string.IsNullOrEmpty(assetPath)) return null;
-
-    string guid = AssetDatabase.AssetPathToGUID(assetPath);
-    if (string.IsNullOrEmpty(guid)) return null;
-
-    return FoldoutKeyPrefix + guid;
-}
-
-private void SaveFoldouts()
-{
-    string key = GetFoldoutStorageKey();
-    if (string.IsNullOrEmpty(key)) return;
-
-    var box = new FoldoutStateBox();
-
-    foreach (var kv in _commandFoldoutsByPath)
     {
-        if (string.IsNullOrEmpty(kv.Key) || kv.Value == null) continue;
+        if (targetSequence == null) return null;
 
-        var entry = new PathEntry { path = kv.Key };
-        foreach (var kv2 in kv.Value)
-        {
-            entry.ids.Add(kv2.Key);
-            entry.values.Add(kv2.Value);
-        }
+        string assetPath = AssetDatabase.GetAssetPath(targetSequence);
+        if (string.IsNullOrEmpty(assetPath)) return null;
 
-        box.entries.Add(entry);
+        string guid = AssetDatabase.AssetPathToGUID(assetPath);
+        if (string.IsNullOrEmpty(guid)) return null;
+
+        return FoldoutKeyPrefix + guid;
     }
 
-    string json = JsonUtility.ToJson(box);
-    SessionState.SetString(key, json);
-    EditorPrefs.SetString(key, json);
-}
-
-private void LoadFoldouts()
-{
-    string key = GetFoldoutStorageKey();
-    if (string.IsNullOrEmpty(key)) return;
-
-    string json = SessionState.GetString(key, "");
-    if (string.IsNullOrEmpty(json))
-        json = EditorPrefs.GetString(key, "");
-
-    _commandFoldoutsByPath.Clear();
-
-    if (string.IsNullOrEmpty(json)) return;
-
-    try
+    private void SaveFoldouts()
     {
-        var box = JsonUtility.FromJson<FoldoutStateBox>(json);
-        if (box?.entries == null) return;
+        string key = GetFoldoutStorageKey();
+        if (string.IsNullOrEmpty(key)) return;
 
-        foreach (var entry in box.entries)
+        var box = new FoldoutStateBox();
+
+        foreach (var kv in _commandFoldoutsByPath)
         {
-            if (entry == null || string.IsNullOrEmpty(entry.path)) continue;
-            if (entry.ids == null || entry.values == null) continue;
+            if (string.IsNullOrEmpty(kv.Key) || kv.Value == null) continue;
 
-            var map = new Dictionary<long, bool>();
-            int n = Mathf.Min(entry.ids.Count, entry.values.Count);
-
-            for (int i = 0; i < n; i++)
+            var entry = new PathEntry { path = kv.Key };
+            foreach (var kv2 in kv.Value)
             {
-                long id = entry.ids[i];
-                if (id == 0) continue;
-                map[id] = entry.values[i];
+                entry.ids.Add(kv2.Key);
+                entry.values.Add(kv2.Value);
             }
 
-            _commandFoldoutsByPath[entry.path] = map;
+            box.entries.Add(entry);
+        }
+
+        string json = JsonUtility.ToJson(box);
+        SessionState.SetString(key, json);
+        EditorPrefs.SetString(key, json);
+    }
+
+    private void LoadFoldouts()
+    {
+        string key = GetFoldoutStorageKey();
+        if (string.IsNullOrEmpty(key)) return;
+
+        string json = SessionState.GetString(key, "");
+        if (string.IsNullOrEmpty(json))
+            json = EditorPrefs.GetString(key, "");
+
+        _commandFoldoutsByPath.Clear();
+
+        if (string.IsNullOrEmpty(json)) return;
+
+        try
+        {
+            var box = JsonUtility.FromJson<FoldoutStateBox>(json);
+            if (box?.entries == null) return;
+
+            foreach (var entry in box.entries)
+            {
+                if (entry == null || string.IsNullOrEmpty(entry.path)) continue;
+                if (entry.ids == null || entry.values == null) continue;
+
+                var map = new Dictionary<long, bool>();
+                int n = Mathf.Min(entry.ids.Count, entry.values.Count);
+
+                for (int i = 0; i < n; i++)
+                {
+                    long id = entry.ids[i];
+                    if (id == 0) continue;
+                    map[id] = entry.values[i];
+                }
+
+                _commandFoldoutsByPath[entry.path] = map;
+            }
+        }
+        catch
+        {
+            // 깨진 데이터면 무시
         }
     }
-    catch
-    {
-        // 깨진 데이터면 무시
-    }
-}
 
     // ------------------------------
     // Rebuild / Lists
@@ -772,7 +874,7 @@ private void LoadFoldouts()
 
             if (!hit && Event.current.type == EventType.Repaint)
             {
-                var dim = EditorGUIUtility.isProSkin ? new Color(0,0,0,0.28f) : new Color(1,1,1,0.38f);
+                var dim = EditorGUIUtility.isProSkin ? new Color(0, 0, 0, 0.28f) : new Color(1, 1, 1, 0.38f);
                 EditorGUI.DrawRect(rect, dim);
             }
 
@@ -780,7 +882,8 @@ private void LoadFoldouts()
             const float countW = 44f;
 
             var labelRect = new Rect(rect.x, rect.y + 1f, labelW, rect.height - 2f);
-            var fieldRect = new Rect(rect.x + labelW + 2f, rect.y + 1f, rect.width - labelW - countW - 4f, rect.height - 2f);
+            var fieldRect = new Rect(rect.x + labelW + 2f, rect.y + 1f, rect.width - labelW - countW - 4f,
+                rect.height - 2f);
             var countRect = new Rect(rect.x + rect.width - countW, rect.y, countW, rect.height);
 
             EditorGUI.LabelField(labelRect, $"Node {index}", EditorStyles.miniLabel);
@@ -1042,7 +1145,8 @@ private void LoadFoldouts()
 
         if (!IsSerializeReferenceCommandList(commandsProp))
         {
-            EditorGUILayout.HelpBox("This editor requires [SerializeReference] polymorphic command lists.", MessageType.Error);
+            EditorGUILayout.HelpBox("This editor requires [SerializeReference] polymorphic command lists.",
+                MessageType.Error);
             return;
         }
 
@@ -1059,6 +1163,7 @@ private void LoadFoldouts()
 
                 _hasSelectedCommand = _commandsList.index >= 0 && _commandsList.index < commandsProp.arraySize;
             }
+
             return;
         }
 
@@ -1196,7 +1301,8 @@ private void LoadFoldouts()
                             DeleteCommandAt(commandsPath, clickedIndex, after: () =>
                             {
                                 if (_commandsList != null)
-                                    _commandsList.index = Mathf.Clamp(clickedIndex - 1, 0, Mathf.Max(0, _commandsList.count - 2));
+                                    _commandsList.index = Mathf.Clamp(clickedIndex - 1, 0,
+                                        Mathf.Max(0, _commandsList.count - 2));
                                 _commandsList = null;
 
                                 ForceCompileAll();
@@ -1221,7 +1327,9 @@ private void LoadFoldouts()
             float lineH = EditorGUIUtility.singleLineHeight;
             var headerRect = new Rect(rect.x, rect.y, rect.width, lineH);
 
-            long id = (element.propertyType == SerializedPropertyType.ManagedReference) ? element.managedReferenceId : 0;
+            long id = (element.propertyType == SerializedPropertyType.ManagedReference)
+                ? element.managedReferenceId
+                : 0;
 
             bool expanded = false;
             if (foldoutMap != null && id != 0 && foldoutMap.TryGetValue(id, out bool saved))
@@ -1230,14 +1338,15 @@ private void LoadFoldouts()
 
             // foldout arrow
             var arrowRect = new Rect(headerRect.x, headerRect.y, 14f, headerRect.height);
-            bool newExpanded = EditorGUI.Foldout(arrowRect, element.isExpanded, GUIContent.none, toggleOnLabelClick: false);
+            bool newExpanded =
+                EditorGUI.Foldout(arrowRect, element.isExpanded, GUIContent.none, toggleOnLabelClick: false);
 
             if (newExpanded != element.isExpanded)
             {
                 element.isExpanded = newExpanded;
                 if (foldoutMap != null && id != 0)
                     foldoutMap[id] = newExpanded;
-                
+
                 SaveFoldouts();
             }
             else
@@ -1452,6 +1561,8 @@ private void LoadFoldouts()
 
             var el = fresh.GetArrayElementAtIndex(idx);
             el.managedReferenceValue = CreateCommandInstance(t);
+            NormalizeInsertedCommandMeta(el, targetTrack: _activeTrack);
+            SyncMetaAfterInsert(el, targetTrack: _activeTrack);
 
             long newId = el.managedReferenceId;
 
@@ -1488,6 +1599,9 @@ private void LoadFoldouts()
 
                 var el = fresh.GetArrayElementAtIndex(idx);
                 el.managedReferenceValue = CreateCommandInstance(types[i]);
+
+                NormalizeInsertedCommandMeta(el, targetTrack: _activeTrack);
+                SyncMetaAfterInsert(el, targetTrack: _activeTrack);
 
                 el.isExpanded = false;
 
@@ -1559,10 +1673,10 @@ private void LoadFoldouts()
         return _activeTrack switch
         {
             CommandTrackType.Interaction => tracksProp.FindPropertyRelative("interaction"),
-            CommandTrackType.Setup       => tracksProp.FindPropertyRelative("setup"),
-            CommandTrackType.Motion      => tracksProp.FindPropertyRelative("motion"),
-            CommandTrackType.Dialogue    => tracksProp.FindPropertyRelative("dialogue"),
-            CommandTrackType.FX          => tracksProp.FindPropertyRelative("fx"),
+            CommandTrackType.Setup => tracksProp.FindPropertyRelative("setup"),
+            CommandTrackType.Motion => tracksProp.FindPropertyRelative("motion"),
+            CommandTrackType.Dialogue => tracksProp.FindPropertyRelative("dialogue"),
+            CommandTrackType.FX => tracksProp.FindPropertyRelative("fx"),
             _ => tracksProp.FindPropertyRelative("dialogue"),
         };
     }
@@ -1570,24 +1684,7 @@ private void LoadFoldouts()
     // ------------------------------
     // Apply default IDs
     // ------------------------------
-    private bool CanApplyIdsToCurrentStepActiveTrack()
-    {
-        if (!HasDefaultIds()) return false;
-
-        if (_nodesProp == null) return false;
-        if (_selectedNode < 0 || _selectedNode >= _nodesProp.arraySize) return false;
-
-        var nodeProp = _nodesProp.GetArrayElementAtIndex(_selectedNode);
-        var stepsProp = nodeProp.FindPropertyRelative("steps");
-        if (stepsProp == null || !stepsProp.isArray) return false;
-        if (_selectedStep < 0 || _selectedStep >= stepsProp.arraySize) return false;
-
-        var stepProp = stepsProp.GetArrayElementAtIndex(_selectedStep);
-        var list = FindActiveTrackList(stepProp);
-        return list != null && list.isArray && list.arraySize > 0;
-    }
-
-    private bool CanApplyIdsToCurrentStepAllTracks()
+    private bool CanApplyIdsToCurrentStep()
     {
         if (!HasDefaultIds()) return false;
 
@@ -1603,7 +1700,7 @@ private void LoadFoldouts()
         var tracksProp = stepProp.FindPropertyRelative("tracks");
         if (tracksProp == null) return false;
 
-        // any list with commands?
+        // 이 Step 안에 커맨드가 하나라도 있는지 확인
         foreach (var name in new[] { "interaction", "setup", "motion", "dialogue", "fx" })
         {
             var lp = tracksProp.FindPropertyRelative(name);
@@ -1614,30 +1711,41 @@ private void LoadFoldouts()
         return false;
     }
 
+    private bool CanApplyIdsToCurrentNode()
+    {
+        if (!HasDefaultIds()) return false;
+
+        if (_nodesProp == null) return false;
+        if (_selectedNode < 0 || _selectedNode >= _nodesProp.arraySize) return false;
+
+        var nodeProp = _nodesProp.GetArrayElementAtIndex(_selectedNode);
+        var stepsProp = nodeProp.FindPropertyRelative("steps");
+        if (stepsProp == null || !stepsProp.isArray) return false;
+
+        // 이 Node 안에 커맨드가 하나라도 있는지 확인
+        for (int si = 0; si < stepsProp.arraySize; si++)
+        {
+            var stepProp = stepsProp.GetArrayElementAtIndex(si);
+            var tracksProp = stepProp.FindPropertyRelative("tracks");
+            if (tracksProp == null) continue;
+
+            foreach (var name in new[] { "interaction", "setup", "motion", "dialogue", "fx" })
+            {
+                var lp = tracksProp.FindPropertyRelative(name);
+                if (lp != null && lp.isArray && lp.arraySize > 0)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     private bool HasDefaultIds()
     {
         return !string.IsNullOrWhiteSpace(_defaultScreenId) || !string.IsNullOrWhiteSpace(_defaultWidgetId);
     }
 
-    private void ApplyDefaultIdsToList(SerializedProperty listProp, string screenId, string widgetRoleKey)
-    {
-        if (listProp == null || !listProp.isArray) return;
-
-        for (int i = 0; i < listProp.arraySize; i++)
-        {
-            var cmdProp = listProp.GetArrayElementAtIndex(i);
-            if (cmdProp == null) continue;
-            if (cmdProp.propertyType != SerializedPropertyType.ManagedReference) continue;
-
-            var screenProp = cmdProp.FindPropertyRelative("screenId");
-            var widgetProp = cmdProp.FindPropertyRelative("widgetRoleKey");
-
-            if (screenProp != null) screenProp.stringValue = screenId;
-            if (widgetProp != null) widgetProp.stringValue = widgetRoleKey;
-        }
-    }
-
-    private void ApplyDefaultIdsToCurrentStep(bool activeOnly)
+    private void ApplyDefaultIdsToCurrentStep()
     {
         if (!HasDefaultIds()) return;
 
@@ -1647,7 +1755,7 @@ private void LoadFoldouts()
         string screenId = _defaultScreenId ?? string.Empty;
         string widgetRoleKey = _defaultWidgetId ?? string.Empty;
 
-        DelayModify(activeOnly ? "Apply IDs (Active Track)" : "Apply IDs (All Tracks)", so =>
+        DelayModify("Apply IDs (Step)", so =>
         {
             var nodes = so.FindProperty("nodes");
             if (nodes == null || !nodes.isArray) return;
@@ -1659,17 +1767,78 @@ private void LoadFoldouts()
             if (stepIndex < 0 || stepIndex >= stepsProp.arraySize) return;
 
             var stepProp = stepsProp.GetArrayElementAtIndex(stepIndex);
-
             var tracksProp = stepProp.FindPropertyRelative("tracks");
             if (tracksProp == null) return;
 
-            if (activeOnly)
+            // 이 Step의 모든 트랙에 기본 ID 적용
+            foreach (var name in new[] { "interaction", "setup", "motion", "dialogue", "fx" })
             {
-                var list = FindActiveTrackList(stepProp);
-                ApplyDefaultIdsToList(list, screenId, widgetRoleKey);
+                var lp = tracksProp.FindPropertyRelative(name);
+                ApplyDefaultIdsToList(lp, screenId, widgetRoleKey);
             }
-            else
+        });
+    }
+
+    private void ApplyDefaultIdsToList(SerializedProperty listProp, string screenId, string roleKey)
+    {
+        if (listProp == null || !listProp.isArray)
+            return;
+
+        bool hasScreen = !string.IsNullOrWhiteSpace(screenId);
+        bool hasRole = !string.IsNullOrWhiteSpace(roleKey);
+
+        if (!hasScreen && !hasRole)
+            return;
+
+        for (int i = 0; i < listProp.arraySize; i++)
+        {
+            var cmdProp = listProp.GetArrayElementAtIndex(i);
+            if (cmdProp == null) continue;
+            if (cmdProp.propertyType != SerializedPropertyType.ManagedReference) continue;
+
+            if (hasScreen)
             {
+                var screenProp = cmdProp.FindPropertyRelative("screenId");
+                if (screenProp != null && screenProp.propertyType == SerializedPropertyType.String)
+                    screenProp.stringValue = screenId;
+            }
+
+            if (hasRole)
+            {
+                var roleProp = cmdProp.FindPropertyRelative("roleKey");
+                if (roleProp != null && roleProp.propertyType == SerializedPropertyType.String)
+                    roleProp.stringValue = roleKey;
+            }
+        }
+    }
+
+
+    private void ApplyDefaultIdsToCurrentNode()
+    {
+        if (!HasDefaultIds()) return;
+
+        int nodeIndex = _selectedNode;
+
+        string screenId = _defaultScreenId ?? string.Empty;
+        string widgetRoleKey = _defaultWidgetId ?? string.Empty;
+
+        DelayModify("Apply IDs (Node)", so =>
+        {
+            var nodes = so.FindProperty("nodes");
+            if (nodes == null || !nodes.isArray) return;
+            if (nodeIndex < 0 || nodeIndex >= nodes.arraySize) return;
+
+            var nodeProp = nodes.GetArrayElementAtIndex(nodeIndex);
+            var stepsProp = nodeProp.FindPropertyRelative("steps");
+            if (stepsProp == null || !stepsProp.isArray) return;
+
+            // 이 Node 안의 모든 Step + 모든 트랙에 기본 ID 적용
+            for (int si = 0; si < stepsProp.arraySize; si++)
+            {
+                var stepProp = stepsProp.GetArrayElementAtIndex(si);
+                var tracksProp = stepProp.FindPropertyRelative("tracks");
+                if (tracksProp == null) continue;
+
                 foreach (var name in new[] { "interaction", "setup", "motion", "dialogue", "fx" })
                 {
                     var lp = tracksProp.FindPropertyRelative(name);
@@ -1739,12 +1908,10 @@ private void LoadFoldouts()
             int idx = _commandsList.index;
             if (idx >= 0 && idx < commandsProp.arraySize)
             {
-                DeleteCommandAt(commandsProp.propertyPath, idx, after: () =>
-                {
-                    _commandsList = null;
-                });
+                DeleteCommandAt(commandsProp.propertyPath, idx, after: () => { _commandsList = null; });
                 e.Use();
             }
+
             return;
         }
 
@@ -1762,6 +1929,7 @@ private void LoadFoldouts()
                     e.Use();
                 }
             }
+
             return;
         }
 
@@ -1778,6 +1946,7 @@ private void LoadFoldouts()
                     e.Use();
                 }
             }
+
             return;
         }
 
@@ -1830,6 +1999,8 @@ private void LoadFoldouts()
                             var pastedEl = fresh.GetArrayElementAtIndex(insertAt);
                             pastedEl.managedReferenceValue = CreateCommandFromJson(json);
 
+                            SyncMetaAfterInsert(pastedEl, targetTrack: _activeTrack);
+
                             _pendingCommandIndex = insertAt;
                             _commandsList = null;
                         });
@@ -1864,6 +2035,7 @@ private void LoadFoldouts()
                 DeleteSelectedStep(stepsProp);
                 e.Use();
             }
+
             return;
         }
 
@@ -1880,6 +2052,7 @@ private void LoadFoldouts()
                 CopyStepToClipboard(step);
                 e.Use();
             }
+
             return;
         }
 
@@ -1916,6 +2089,7 @@ private void LoadFoldouts()
 
                 e.Use();
             }
+
             return;
         }
 
@@ -2020,10 +2194,10 @@ private void LoadFoldouts()
         if (string.IsNullOrEmpty(typeName)) typeName = "(null-ref)";
 
         string screenId = cmdProp.FindPropertyRelative("screenId")?.stringValue ?? "";
-        string widgetRoleKey = cmdProp.FindPropertyRelative("widgetRoleKey")?.stringValue ?? "";
+        string roleKey = cmdProp.FindPropertyRelative("roleKey")?.stringValue ?? "";
 
-        if (!string.IsNullOrWhiteSpace(screenId) || !string.IsNullOrWhiteSpace(widgetRoleKey))
-            return $"#{index} {typeName}  ({screenId}/{widgetRoleKey})";
+        if (!string.IsNullOrWhiteSpace(screenId) || !string.IsNullOrWhiteSpace(roleKey))
+            return $"#{index} {typeName}  ({screenId}/{roleKey})";
 
         return $"#{index} {typeName}";
     }
@@ -2041,6 +2215,183 @@ private void LoadFoldouts()
 
         int lastDot = className.LastIndexOf('.');
         return lastDot >= 0 ? className.Substring(lastDot + 1) : className;
+    }
+
+    private readonly struct Origin
+    {
+        public readonly CommandTrackType track;
+        public readonly int index;
+
+        public Origin(CommandTrackType t, int i)
+        {
+            track = t;
+            index = i;
+        }
+    }
+
+    private Dictionary<long, Origin> BuildOriginMapForStep(SerializedProperty stepProp)
+    {
+        var map = new Dictionary<long, Origin>();
+
+        var tracksProp = stepProp.FindPropertyRelative("tracks");
+        if (tracksProp == null) return map;
+
+        void ScanList(string name, CommandTrackType track)
+        {
+            var lp = tracksProp.FindPropertyRelative(name);
+            if (lp == null || !lp.isArray) return;
+
+            for (int i = 0; i < lp.arraySize; i++)
+            {
+                var el = lp.GetArrayElementAtIndex(i);
+                if (el == null) continue;
+                if (el.propertyType != SerializedPropertyType.ManagedReference) continue;
+
+                long id = el.managedReferenceId;
+                if (id == 0) continue;
+
+                // first wins (should be unique anyway)
+                if (!map.ContainsKey(id))
+                    map[id] = new Origin(track, i);
+            }
+        }
+
+        ScanList("interaction", CommandTrackType.Interaction);
+        ScanList("setup", CommandTrackType.Setup);
+        ScanList("motion", CommandTrackType.Motion);
+        ScanList("dialogue", CommandTrackType.Dialogue);
+        ScanList("fx", CommandTrackType.FX);
+
+        return map;
+    }
+
+    private bool TryGetOrigin(SerializedProperty compiledEl, Dictionary<long, Origin> originMap, out Origin origin)
+    {
+        origin = default;
+
+        if (compiledEl == null || compiledEl.propertyType != SerializedPropertyType.ManagedReference)
+            return false;
+
+        long id = compiledEl.managedReferenceId;
+        if (id == 0) return false;
+
+        return originMap != null && originMap.TryGetValue(id, out origin);
+    }
+
+    private static string PhaseShort(CommandPhase p) => p switch
+    {
+        CommandPhase.Setup => "S",
+        CommandPhase.Motion => "M",
+        CommandPhase.Dialogue => "D",
+        CommandPhase.FX => "F",
+        CommandPhase.Teardown => "T",
+        _ => "?"
+    };
+
+    private static string TrackShort(CommandTrackType t) => t switch
+    {
+        CommandTrackType.Interaction => "I",
+        CommandTrackType.Setup => "S",
+        CommandTrackType.Motion => "M",
+        CommandTrackType.Dialogue => "D",
+        CommandTrackType.FX => "FX",
+        _ => "?"
+    };
+
+    private static bool TryReadMeta(SerializedProperty cmdProp,
+        out CommandTrackType metaTrack,
+        out CommandPhase metaPhase,
+        out bool blocking,
+        out bool infinite,
+        out float duration)
+    {
+        metaTrack = default;
+        metaPhase = default;
+        blocking = false;
+        infinite = false;
+        duration = 0f;
+
+        if (cmdProp == null || cmdProp.propertyType != SerializedPropertyType.ManagedReference)
+            return false;
+
+        // meta field name can be "meta" or "Meta"
+        var meta =
+            cmdProp.FindPropertyRelative("_meta") ??
+            cmdProp.FindPropertyRelative("meta") ??
+            cmdProp.FindPropertyRelative("Meta");
+        if (meta == null) return false;
+
+        var tr = meta.FindPropertyRelative("track");
+        var ph = meta.FindPropertyRelative("phase");
+        var bh = meta.FindPropertyRelative("blockingHint");
+        var ih = meta.FindPropertyRelative("infiniteHint");
+        var dh = meta.FindPropertyRelative("durationHint");
+
+        if (tr != null && tr.propertyType == SerializedPropertyType.Enum)
+            metaTrack = (CommandTrackType)tr.intValue;
+
+        if (ph != null && ph.propertyType == SerializedPropertyType.Enum)
+            metaPhase = (CommandPhase)ph.intValue;
+
+        if (bh != null && bh.propertyType == SerializedPropertyType.Boolean)
+            blocking = bh.boolValue;
+        if (ih != null && ih.propertyType == SerializedPropertyType.Boolean)
+            infinite = ih.boolValue;
+        if (dh != null && dh.propertyType == SerializedPropertyType.Float)
+            duration = dh.floatValue;
+
+        return true;
+    }
+
+    private string SummarizeCompiledLine(
+        SerializedProperty cmdProp,
+        int compiledIndex,
+        Dictionary<long, Origin> originMap,
+        out bool hasDrift,
+        out bool missingOrigin)
+    {
+        hasDrift = false;
+        missingOrigin = false;
+
+        // Base info (type + ids)
+        string baseLine = SummarizeCommand(cmdProp, compiledIndex);
+
+        // Meta info
+        bool hasMeta = TryReadMeta(cmdProp, out var metaTrack, out var metaPhase, out bool block, out bool inf,
+            out float dur);
+
+        // Origin info (where it lives in tracks)
+        bool hasOrigin = TryGetOrigin(cmdProp, originMap, out var origin);
+        if (!hasOrigin)
+            missingOrigin = true;
+
+        // Drift detection: Meta.track vs origin track
+        if (hasMeta && hasOrigin)
+        {
+            if (metaTrack != origin.track)
+                hasDrift = true;
+        }
+
+        // Build badges
+        string phaseBadge = hasMeta ? $"P:{PhaseShort(metaPhase)}" : "P:?";
+        string trackBadge = hasMeta ? $"T:{TrackShort(metaTrack)}" : "T:?";
+
+        // Timing hints
+        string time = "";
+        if (hasMeta)
+        {
+            if (block) time += " [B]";
+            if (inf) time += " [INF]";
+            if (dur > 0f) time += $" [{dur:0.###}s]";
+        }
+
+        // Origin tag (for jump / debug)
+        string originTag = hasOrigin ? $"  -> {TrackShort(origin.track)}#{origin.index}" : "  -> (missing)";
+
+        // Drift marker
+        string driftTag = hasDrift ? "  !!drift" : "";
+
+        return $"#{compiledIndex} [{phaseBadge}][{trackBadge}]{time} {baseLine}{originTag}{driftTag}";
     }
 
     // ------------------------------
@@ -2077,7 +2428,7 @@ private void LoadFoldouts()
                 inst.screenId = _defaultScreenId;
 
             if (!string.IsNullOrWhiteSpace(_defaultWidgetId))
-                inst.widgetRoleKey = _defaultWidgetId;
+                inst.roleKey = _defaultWidgetId;
         }
 
         return inst;
@@ -2100,10 +2451,7 @@ private void LoadFoldouts()
             commandTypes: _cachedCommandTypes,
             onAddSingleRequested: onSingle,
             onAddBatchRequested: onBatch,
-            extendMenu: menu =>
-            {
-                extendMenu?.Invoke(menu);
-            });
+            extendMenu: menu => { extendMenu?.Invoke(menu); });
 
         if (handled)
             return;
@@ -2123,7 +2471,7 @@ private void LoadFoldouts()
                 fallback.AddItem(new GUIContent(tt.Name), false, () => onSingle(tt));
             }
         }
-        
+
         extendMenu?.Invoke(fallback);
         fallback.ShowAsContext();
     }
@@ -2163,7 +2511,8 @@ private void LoadFoldouts()
         return map;
     }
 
-    private void RestoreCommandFoldouts(SerializedProperty commandsProp, Dictionary<long, bool> map, long newIdToCollapse)
+    private void RestoreCommandFoldouts(SerializedProperty commandsProp, Dictionary<long, bool> map,
+        long newIdToCollapse)
     {
         if (commandsProp == null || !commandsProp.isArray) return;
 
@@ -2218,6 +2567,7 @@ private void LoadFoldouts()
                 if (!alive.Contains(kv.Key))
                     toRemove.Add(kv.Key);
             }
+
             for (int i = 0; i < toRemove.Count; i++)
                 map.Remove(toRemove[i]);
         }
@@ -2374,6 +2724,8 @@ private void LoadFoldouts()
 
             var el = fresh.GetArrayElementAtIndex(idx);
             el.managedReferenceValue = factory?.Invoke();
+            NormalizeInsertedCommandMeta(el, targetTrack: _activeTrack);
+            SyncMetaAfterInsert(el, targetTrack: _activeTrack);
 
             long newId = el.managedReferenceId;
 
@@ -2526,10 +2878,10 @@ private void LoadFoldouts()
     private static int TrackToIndex(CommandTrackType t) => t switch
     {
         CommandTrackType.Interaction => 0,
-        CommandTrackType.Setup       => 1,
-        CommandTrackType.Motion      => 2,
-        CommandTrackType.Dialogue    => 3,
-        CommandTrackType.FX          => 4,
+        CommandTrackType.Setup => 1,
+        CommandTrackType.Motion => 2,
+        CommandTrackType.Dialogue => 3,
+        CommandTrackType.FX => 4,
         _ => 3
     };
 
@@ -2582,10 +2934,10 @@ private void LoadFoldouts()
         if (src.tracks != null)
         {
             CloneListInto(src.tracks.interaction, dst.tracks.interaction);
-            CloneListInto(src.tracks.setup,       dst.tracks.setup);
-            CloneListInto(src.tracks.motion,      dst.tracks.motion);
-            CloneListInto(src.tracks.dialogue,    dst.tracks.dialogue);
-            CloneListInto(src.tracks.fx,          dst.tracks.fx);
+            CloneListInto(src.tracks.setup, dst.tracks.setup);
+            CloneListInto(src.tracks.motion, dst.tracks.motion);
+            CloneListInto(src.tracks.dialogue, dst.tracks.dialogue);
+            CloneListInto(src.tracks.fx, dst.tracks.fx);
         }
 
         return dst;
@@ -2612,6 +2964,111 @@ private void LoadFoldouts()
         EditorJsonUtility.FromJsonOverwrite(json, clone);
 
         return clone;
+    }
+
+    private void JumpToOrigin(SerializedProperty stepProp, CommandTrackType track, int index)
+    {
+        // 1) switch track tab
+        _activeTrack = track;
+
+        // 2) reset command list cache so it rebuilds for the new track
+        _commandsList = null;
+        _commandsPropPath = null;
+
+        // 3) select the command in that track list
+        _pendingCommandIndex = Mathf.Max(0, index);
+
+        // 4) approximate scroll: move the right panel down roughly to the row
+        // (exact rect scroll is hard with variable element heights, but this works well enough)
+        _scrollToCommandIndex = true;
+        _scrollTargetCommandIndex = _pendingCommandIndex;
+
+        // also ensure we're on this step (defensive)
+        _hasSelectedCommand = true;
+
+        Repaint();
+    }
+
+    private void NormalizeInsertedCommandMeta(SerializedProperty cmdProp, CommandTrackType targetTrack)
+    {
+        var meta = cmdProp.FindPropertyRelative("_meta") ??
+                   cmdProp.FindPropertyRelative("meta") ??
+                   cmdProp.FindPropertyRelative("Meta");
+        if (meta == null) return;
+
+        var tr = meta.FindPropertyRelative("track");
+        if (tr != null && tr.propertyType == SerializedPropertyType.Enum)
+            tr.intValue = (int)targetTrack;
+
+        // (선택) phase도 자동화하려면 여기서 phase도 바꿔주기
+        // var ph = meta.FindPropertyRelative("phase");
+        // ph.enumValueIndex = ...
+    }
+
+    private void SyncMetaAfterInsert(SerializedProperty cmdProp, CommandTrackType targetTrack)
+    {
+        if (cmdProp == null || cmdProp.propertyType != SerializedPropertyType.ManagedReference)
+            return;
+
+        // managedReferenceValue로 실제 인스턴스를 잡을 수 있음(에디터).
+        var spec = cmdProp.managedReferenceValue as CommandSpecBase;
+        if (spec == null) return;
+
+        // 1) 어트리뷰트 기본값 생성
+        var meta = CommandMetaDefaults.GetDefault(spec.GetType());
+
+        // 2) 목적지 트랙 강제 보정(드리프트 방지)
+        meta.track = targetTrack;
+
+        // (선택) phase는 정책에 따라:
+        // - 그대로 meta.phase(어트리뷰트값) 유지하는게 보통 정답
+        // - 트랙에 따라 phase를 강제하고 싶으면 여기서 덮어써도 됨
+
+        spec.Editor_SetMeta(meta);
+    }
+
+    private void FixDriftForCurrentStep()
+    {
+        int nodeIndex = _selectedNode;
+        int stepIndex = _selectedStep;
+
+        DelayModify("Fix Drift (Step)", so =>
+        {
+            var seq = (SequenceSpecSO)so.targetObject;
+            if (seq == null) return;
+            if (seq.nodes == null) return;
+            if (nodeIndex < 0 || nodeIndex >= seq.nodes.Count) return;
+
+            var node = seq.nodes[nodeIndex];
+            if (node.steps == null) return;
+            if (stepIndex < 0 || stepIndex >= node.steps.Count) return;
+
+            var step = node.steps[stepIndex];
+            if (step.tracks == null) return;
+
+            // 각 트랙 리스트별로 meta 다시 굽기
+            RebakeMetaList(step.tracks.interaction, CommandTrackType.Interaction);
+            RebakeMetaList(step.tracks.setup, CommandTrackType.Setup);
+            RebakeMetaList(step.tracks.motion, CommandTrackType.Motion);
+            RebakeMetaList(step.tracks.dialogue, CommandTrackType.Dialogue);
+            RebakeMetaList(step.tracks.fx, CommandTrackType.FX);
+        }, forceRebuild: false);
+    }
+
+    private static void RebakeMetaList(List<CommandSpecBase> list, CommandTrackType track)
+    {
+        if (list == null) return;
+
+        for (int i = 0; i < list.Count; i++)
+        {
+            var spec = list[i];
+            if (spec == null) continue;
+
+            var meta = CommandMetaDefaults.GetDefault(spec.GetType());
+            meta.track = track; //
+
+            spec.Editor_SetMeta(meta);
+        }
     }
 }
 #endif
