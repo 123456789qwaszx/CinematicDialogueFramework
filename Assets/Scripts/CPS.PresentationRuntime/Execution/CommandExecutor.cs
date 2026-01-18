@@ -156,13 +156,13 @@ public sealed class CommandExecutor : MonoBehaviour
         }
 
         StepSpec step = node.steps[stepIndex];
-        if (step == null || step.commands == null || step.commands.Count == 0)
+        if (step == null || step.compiled == null || step.compiled.Count == 0)
         {
             Log($"Step Empty (step={step})");
             return list;
         }
 
-        foreach (CommandSpecBase spec in step.commands)
+        foreach (CommandSpecBase spec in step.compiled)
         {
             if (spec == null)
             {

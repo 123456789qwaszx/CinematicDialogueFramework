@@ -16,13 +16,13 @@ public abstract class CommandBase : ISequenceCommand, IStepScopedCommand
 
     // If true, the StepGateRunner waits for this command to finish before moving on.
     // If false, it runs in the background (fire-and-forget) and should be tracked via SequencePlayer.
-    public virtual bool WaitForCompletion => true;
-    protected bool IsCancelled(CommandRunScope scope) => scope.Token.IsCancellationRequested;
+    public virtual bool WaitForCompletion => false;
+    protected bool IsCanceled(CommandRunScope scope) => scope.Token.IsCancellationRequested;
 
     public IEnumerator Execute(CommandRunScope scope)
     {
         if (scope == null) yield break;
-        if (scope.Token.IsCancellationRequested) yield break;
+        if (IsCanceled(scope)) yield break;
 
         if (scope.IsSkipping)
         {
@@ -64,16 +64,14 @@ public abstract class CommandBase : ISequenceCommand, IStepScopedCommand
 
     protected abstract IEnumerator ExecuteInner(CommandRunScope scope);
 
-    protected virtual void OnSkip(CommandRunScope scope)
-    {
-    }
+    protected virtual void OnSkip(CommandRunScope scope) { }
 
     protected IEnumerator Wait(CommandRunScope scope, float seconds)
     {
         float elapsed = 0f;
         while (elapsed < seconds)
         {
-            if (scope.Token.IsCancellationRequested) yield break;
+            if (IsCanceled(scope)) yield break;
 
             if (scope.IsSkipping)
             {

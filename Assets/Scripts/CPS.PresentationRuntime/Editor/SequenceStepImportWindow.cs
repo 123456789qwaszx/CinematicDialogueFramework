@@ -131,7 +131,7 @@ public sealed class SequenceStepImportWindow : EditorWindow
             {
                 editorName = srcStep.editorName + " (imported)",
                 gate       = srcStep.gate,
-                commands   = StepPaletteCloneUtil.CloneCommands(srcStep.commands)
+                compiled   = StepPaletteCloneUtil.CloneCommands(srcStep.compiled)
             };
 
             dstNode.steps.Add(clonedStep);

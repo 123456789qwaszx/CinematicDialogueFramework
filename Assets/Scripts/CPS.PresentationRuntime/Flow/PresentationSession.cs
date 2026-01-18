@@ -39,13 +39,12 @@ public sealed class PresentationSession
     public void Start(Route route, SequenceSpecSO sequence)
     {
         if (sequence == null) return;
+        _gateAdvancer.ClearLatchedSignals();
+        _executor.Stop();
         
         _state = new SequenceProgressState(route);
         _sequence = sequence;
         
-        _sessionScope?.CleanupRun(CleanupPolicy.Finish);
-        _sessionScope?.CleanupStep(CleanupPolicy.Finish);
-        //_sessionScope?.CancelAll();
         _sessionScope = new CommandRunScope(_context);
 
         _gatePlanner.BuildForCurrentNode(_sequence, _state);
